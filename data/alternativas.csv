@@ -1,0 +1,29 @@
+﻿Número da pergunta;Letra;Texto da alternativa;Correta ou incorreta;Texto de acerto;Texto de erro
+1;A;Clicar no link e informar a senha para evitar o bloqueio;Incorreta;;Links de e-mails inesperados podem levar a páginas falsas que roubam credenciais.
+1;B;Encaminhar o e-mail a todos os colegas como alerta;Incorreta;;"Encaminhar espalha o golpe; o correto é reportar ao setor responsável."
+1;C;Não clicar, verificar o remetente e reportar à TI;Correta;Correto: desconfie de urgência e de pedidos de senha, confira o remetente e comunique a equipe de segurança.;
+1;D;Responder ao e-mail pedindo mais informações;Incorreta;;Responder confirma que seu endereço está ativo e pode gerar novas tentativas de golpe.
+2;A;Usar a mesma senha forte em todos os sistemas;Incorreta;;Reutilizar senhas faz o vazamento de um serviço comprometer todos os outros.
+2;B;Ativar a autenticação em dois fatores (MFA);Correta;Correto: o segundo fator impede o acesso mesmo que a senha seja descoberta.;
+2;C;Anotar a senha em um post-it preso ao monitor;Incorreta;;Senhas expostas fisicamente podem ser vistas ou copiadas por qualquer pessoa.
+3;A;Dados gravados apenas no disco rígido do seu computador;Incorreta;;Isso descreve o armazenamento local, não o armazenamento em nuvem.
+3;B;Dados guardados somente em pen drives;Incorreta;;"Pen drives são mídias locais e portáteis; não dependem de servidores remotos."
+3;C;Dados que existem apenas na memória RAM;Incorreta;;A RAM é volátil: perde o conteúdo quando o equipamento é desligado.
+3;D;Dados mantidos em servidores remotos e acessados pela internet;Correta;Correto: na nuvem os dados ficam em servidores remotos e podem ser acessados de qualquer lugar com internet.;
+4;A;Três cópias dos dados, em duas mídias diferentes, uma delas fora do local;Correta;Correto: 3 cópias, 2 tipos de mídia e 1 cópia off-site protegem contra falhas, desastres e roubo.;
+4;B;Uma cópia no próprio computador, em outra pasta;Incorreta;;Uma pasta no mesmo equipamento se perde junto com ele.
+4;C;Duas cópias no mesmo HD externo;Incorreta;;"Cópias na mesma mídia falham juntas; faltam mídias e local distintos."
+4;D;Uma cópia semanal enviada por e-mail para si mesmo;Incorreta;;Não é um plano estruturado de backup e depende de limites do serviço de e-mail.
+5;A;Permitir o uso dos dados para qualquer fim futuro;Incorreta;;"A LGPD exige finalidade determinada; novos usos pedem nova base legal."
+5;B;Ocorrer sem conhecimento do titular, para agilizar processos;Incorreta;;O titular tem direito à informação clara sobre o tratamento de seus dados.
+5;C;Ter finalidade legítima, específica e informada ao titular;Correta;Correto: finalidade, adequação e transparência são princípios centrais da LGPD.;
+6;A;Lei nº 12.527/2011 (Lei de Acesso à Informação);Correta;Correto: a LAI garante o direito de qualquer pessoa receber informações dos órgãos públicos.;
+6;B;Lei nº 8.112/1990 (regime jurídico dos servidores);Incorreta;;Essa lei trata do regime dos servidores públicos federais.
+6;C;Lei nº 9.784/1999 (processo administrativo federal);Incorreta;;Essa lei regula o processo administrativo, não o acesso à informação.
+6;D;Lei nº 14.133/2021 (licitações e contratos);Incorreta;;Essa lei trata de licitações e contratos administrativos.
+7;A;Impessoalidade;Incorreta;;Impessoalidade trata de agir sem favoritismos, não da divulgação dos atos.
+7;B;Publicidade;Correta;Correto: a publicidade dá transparência e permite o controle dos atos pela sociedade.;
+8;A;Colar dados pessoais de servidores para obter respostas mais precisas;Incorreta;;Dados pessoais não devem ser inseridos em ferramentas externas sem base legal e autorização.
+8;B;Conferir as informações em fontes confiáveis antes de usá-las;Correta;Correto: respostas de IA podem conter erros ou fontes inventadas e precisam de verificação.;
+8;C;Considerar que a resposta gerada está sempre correta;Incorreta;;"Modelos de IA podem ""alucinar"", ou seja, apresentar como verdadeiro o que é falso."
+8;D;Ocultar o uso da ferramenta mesmo quando a transparência é exigida;Incorreta;;Quando exigido, o uso de IA deve ser declarado.

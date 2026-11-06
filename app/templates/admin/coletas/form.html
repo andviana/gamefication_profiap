@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block conteudo %}
+<p class="sub" style="margin-bottom:4px"><a href="{{ url_for('admin.coletas_detalhe', coleta_id=coleta.id) if coleta else url_for('admin.coletas_lista') }}">← {{ 'Coleta ' ~ coleta.codigo if coleta else 'Coletas' }}</a></p>
+<h1>{{ titulo }}</h1>
+
+{% if travada %}
+<div class="br-message warning" role="note" style="margin-bottom:16px">
+  <div class="icon"><i class="fas fa-lock fa-lg" aria-hidden="true"></i></div>
+  <div class="content">Esta coleta já tem partidas. O <strong>questionário, o campus, o curso, o ano e o período não mudam mais</strong>, porque definem a que turma as respostas pertencem.
+    Você pode ajustar o <strong>prazo</strong> (por exemplo, prorrogar) e ativar ou desativar a coleta. Para outra turma, crie uma nova coleta.</div>
+</div>
+{% elif not coleta %}
+<div class="br-message info" role="note" style="margin-bottom:16px">
+  <div class="icon"><i class="fas fa-info-circle fa-lg" aria-hidden="true"></i></div>
+  <div class="content">O código de acesso é gerado automaticamente. Ao vincular um questionário em <strong>rascunho</strong>, ele passa a “em coleta” e
+    <strong>a estrutura dele trava na primeira resposta recebida</strong>: revise as perguntas antes de divulgar o código.</div>
+</div>
+{% endif %}
+
+<form method="post" id="form-coleta" novalidate class="cartao form-grade">
+  {{ form.hidden_tag() }}
+
+  {% if duplicadas %}
+  <div class="br-message warning" role="alert">
+    <div class="icon"><i class="fas fa-exclamation-triangle fa-lg" aria-hidden="true"></i></div>
+    <div class="content">
+      <strong>Já existe{{ 'm' if duplicadas|length > 1 }} {{ duplicadas|length }} coleta{{ 's' if duplicadas|length > 1 }} para esta mesma turma</strong>
+      (mesmo questionário, campus, curso, ano e período):
+      <ul style="margin:6px 0 8px 18px">{% for d in duplicadas %}
+        <li><a href="{{ url_for('admin.coletas_detalhe', coleta_id=d.id) }}"><strong class="codigo-inline">{{ d.codigo }}</strong></a> · {{ d.data_inicio|data_br }} a {{ d.data_fim|data_br }}</li>{% endfor %}</ul>
+      Se for realmente outra turma (por exemplo, duas turmas do mesmo curso e período), pode continuar. Os dados continuam separados por código.
+      <div class="acoes-form" style="margin-top:10px">
+        <button class="br-button primary" type="submit" name="confirmar_duplicidade" value="1">{{ 'Salvar mesmo assim' if coleta else 'Criar mesmo assim' }}</button>
+        <span class="dica" style="align-self:center">ou altere os campos abaixo e salve de novo</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {{ campo(form.questionario_id, desativado=travada) }}
+  <div class="grade-2">
+    <div>{{ campo(form.campus_id, desativado=travada) }}</div>
+    <div>{{ campo(form.curso_id, desativado=travada) }}</div>
+  </div>
+  <div class="grade-2">
+    <div>{{ campo(form.ano, desativado=travada) }}</div>
+    <div>{{ campo(form.periodo, desativado=travada) }}</div>
+  </div>
+  <div class="grade-2">
+    <div>{{ campo(form.data_inicio, "Vale a partir das 00:00 deste dia (horário de " ~ fuso ~ ").") }}</div>
+    <div>{{ campo(form.data_fim, "Vale até as 23:59 deste dia, inclusive.") }}</div>
+  </div>
+  <div class="acoes-form">
+    <button class="br-button primary" type="submit">{{ 'Criar coleta' if not coleta else 'Salvar' }}</button>
+    <a class="br-button secondary" href="{{ url_for('admin.coletas_detalhe', coleta_id=coleta.id) if coleta else url_for('admin.coletas_lista') }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

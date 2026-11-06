@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macros.html" import acao_post %}
+{% block titulo %}Coleta {{ coleta.codigo }}{% endblock %}
+{% block conteudo %}
+<p class="sub" style="margin-bottom:4px"><a href="{{ url_for('admin.coletas_lista') }}">← Coletas</a></p>
+<div class="barra">
+  <h1 style="margin:0">Coleta <span class="codigo-inline">{{ coleta.codigo }}</span> <span class="badge sit-{{ situacao }}" style="vertical-align:middle">{{ situacao }}</span></h1>
+  <div class="acoes-form" style="margin:0">
+    <a class="br-button secondary" href="{{ url_for('admin.coletas_editar', coleta_id=coleta.id) }}">Editar</a>
+    {% if coleta.ativo %}
+      {{ acao_post(url_for('admin.coletas_ativo', coleta_id=coleta.id), 'Desativar', 'Desativar a coleta ' ~ coleta.codigo ~ '? O código deixa de funcionar até você reativá-la.', 'br-button secondary perigo') }}
+    {% else %}
+      <form method="post" action="{{ url_for('admin.coletas_ativo', coleta_id=coleta.id) }}" style="display:inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="ativo" value="1">
+        <button class="br-button primary" type="submit">Ativar</button></form>
+    {% endif %}
+  </div>
+</div>
+<p class="sub">{{ explica }}</p>
+
+<div class="cartao cartao-codigo" style="margin-bottom:16px">
+  <div class="cod-rotulo">Código de acesso</div>
+  <div class="cod-grande" aria-label="Código {{ coleta.codigo }}">{{ coleta.codigo }}</div>
+  <button type="button" class="br-button primary" data-copiar="{{ coleta.codigo }}"><i class="fas fa-copy" aria-hidden="true"></i> Copiar código</button>
+  <p class="dica">Divulgue este código aos alunos: eles o digitam ao abrir o jogo. O código não muda, mesmo se você editar a coleta.</p>
+</div>
+
+<div class="grade-2">
+  <div class="cartao">
+    <h2>Turma</h2>
+    <dl class="ficha">
+      <dt>Questionário</dt><dd><a href="{{ url_for('admin.questionarios_detalhe', questionario_id=coleta.questionario_id) }}">{{ coleta.questionario.nome }}</a>
+        <span class="badge {{ estado_questionario|replace(' ', '-') }}">{{ estado_questionario }}</span></dd>
+      <dt>Campus</dt><dd>{{ coleta.campus.nome }}</dd>
+      <dt>Curso</dt><dd>{{ coleta.curso.nome }}</dd>
+      <dt>Ano e período</dt><dd>{{ coleta.ano }}, {{ coleta.periodo }}º período</dd>
+    </dl>
+  </div>
+  <div class="cartao">
+    <h2>Prazo e respostas</h2>
+    <dl class="ficha">
+      <dt>Início</dt><dd>{{ coleta.data_inicio|data_br }}, a partir das 00:00</dd>
+      <dt>Fim</dt><dd>{{ coleta.data_fim|data_br }}, até as 23:59</dd>
+      <dt>Fuso</dt><dd>{{ fuso }}</dd>
+      <dt>Partidas</dt><dd>{{ n_partidas }}{% if n_partidas %} <span class="dica">(a identidade da turma está travada)</span>{% endif %}</dd>
+      <dt>Criada em</dt><dd>{{ coleta.criada_em|data_local('%d/%m/%Y %H:%M') }}</dd>
+    </dl>
+  </div>
+</div>
+{% endblock %}

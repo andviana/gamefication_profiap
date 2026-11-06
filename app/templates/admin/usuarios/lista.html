@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import acao_post %}
+{% block titulo %}Usuários{% endblock %}
+{% block conteudo %}
+<div class="barra">
+  <div><h1>Usuários</h1><p class="sub" style="margin:0">{{ usuarios|length }} {{ 'usuário' if usuarios|length == 1 else 'usuários' }}</p></div>
+  <a class="br-button primary" href="{{ url_for('admin.usuarios_novo') }}"><i class="fas fa-plus" aria-hidden="true"></i> Novo usuário</a>
+</div>
+
+<div class="cartao">
+  <div class="tabela-wrap">
+    <table class="dados">
+      <caption class="sr-only" style="position:absolute;left:-9999px">Usuários do painel</caption>
+      <thead><tr><th scope="col">Nome</th><th scope="col">Login</th><th scope="col">Perfil</th><th scope="col">Criado em</th><th scope="col" style="text-align:right">Ações</th></tr></thead>
+      <tbody>
+      {% for u in usuarios %}
+        <tr>
+          <td>{{ u.nome }}{% if u.id == current_user.id %} <span class="badge comum">você</span>{% endif %}</td>
+          <td>{{ u.login }}</td>
+          <td><span class="badge {{ 'raiz' if u.raiz else u.perfil }}">{{ 'super admin raiz' if u.raiz else ('super admin' if u.eh_superadmin else 'comum') }}</span></td>
+          <td>{{ u.criado_em|data_local }}</td>
+          <td class="acoes">
+            {% if pode_gerenciar(current_user, u) %}
+              <a class="link-btn" href="{{ url_for('admin.usuarios_editar', usuario_id=u.id) }}">Editar</a>
+              <a class="link-btn" href="{{ url_for('admin.usuarios_senha', usuario_id=u.id) }}">Redefinir senha</a>
+            {% endif %}
+            {% if pode_promover(current_user, u) %}
+              {{ acao_post(url_for('admin.usuarios_promover', usuario_id=u.id), 'Promover a super admin', 'Promover ' ~ u.login ~ ' a super admin? Ele(a) passará a gerenciar usuários comuns.') }}
+            {% endif %}
+            {% if pode_revogar(current_user, u) %}
+              {{ acao_post(url_for('admin.usuarios_revogar', usuario_id=u.id), 'Revogar super admin', 'Revogar o perfil de super admin de ' ~ u.login ~ '?') }}
+            {% endif %}
+            {% if pode_gerenciar(current_user, u) %}
+              {{ acao_post(url_for('admin.usuarios_excluir', usuario_id=u.id), 'Excluir', 'Excluir o usuário ' ~ u.login ~ '? Esta ação não pode ser desfeita.', 'link-btn perigo') }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

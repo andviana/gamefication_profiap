@@ -1,0 +1,22 @@
+{# Campo de formulário no padrão do gov.br DS (br-input) com mensagem de erro acessível. #}
+{% macro campo(field, dica=None, desativado=False) %}
+  {% set erro = field.errors|length > 0 %}
+  <div class="br-input{{ ' danger' if erro }}">
+    {{ field.label }}
+    {{ field(class_="", disabled=desativado, **{'aria-describedby': field.id ~ '-info', 'aria-invalid': 'true' if erro else 'false'}) }}
+    <div id="{{ field.id }}-info">
+      {% for msg in field.errors %}
+        <span class="feedback danger" role="alert"><i class="fas fa-times-circle" aria-hidden="true"></i>{{ msg }}</span>
+      {% endfor %}
+      {% if dica %}<p class="dica">{{ dica }}</p>{% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{# Botão de ação que envia um POST (com CSRF), p.ex. promover ou excluir. #}
+{% macro acao_post(url, rotulo, confirmar=None, classe='link-btn') %}
+  <form method="post" action="{{ url }}"{% if confirmar %} data-confirmar="{{ confirmar }}"{% endif %}>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="{{ classe }}">{{ rotulo }}</button>
+  </form>
+{% endmacro %}

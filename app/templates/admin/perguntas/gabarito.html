@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titulo %}Trocar gabarito{% endblock %}
+{% block conteudo %}
+<p class="sub" style="margin-bottom:4px"><a href="{{ url_for('admin.questionarios_detalhe', questionario_id=q.id) }}">← {{ q.nome }}</a></p>
+<h1>Trocar o gabarito da pergunta {{ pergunta.numero }}</h1>
+<p class="sub">{{ pergunta.titulo }}</p>
+
+<div class="br-message warning" role="alert" style="margin-bottom:16px">
+  <div class="icon"><i class="fas fa-exclamation-triangle fa-lg" aria-hidden="true"></i></div>
+  <div class="content">
+    {% if respostas %}
+      Esta pergunta já tem <strong>{{ respostas }}</strong> respostas em <strong>{{ partidas }}</strong> partidas. Ao trocar o gabarito, o sistema
+      <strong>recalcula quem acertou</strong> e o total de acertos dessas partidas, e o dashboard passa a refletir o novo critério.
+      Relatórios já exportados antes da troca ficam desatualizados. A operação é registrada na auditoria.
+    {% else %}
+      Esta pergunta ainda não tem respostas gravadas; a troca vale daqui para frente.
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" novalidate class="cartao form-grade"
+      data-confirmar="Trocar o gabarito da pergunta {{ pergunta.numero }}?{% if respostas %} {{ respostas }} respostas serão recalculadas.{% endif %}">
+  {{ form.hidden_tag() }}
+  <p class="sub" style="margin:0"><strong>Enunciado:</strong> {{ pergunta.texto }}</p>
+  {% for msg in form.correta.errors %}<span class="feedback danger" role="alert"><i class="fas fa-times-circle" aria-hidden="true"></i>{{ msg }}</span>{% endfor %}
+  {% for a in pergunta.alternativas %}
+    <label class="alt-bloco radio-linha{{ ' atual' if a.correta }}">
+      <input type="radio" name="correta" value="{{ a.letra }}" {{ 'disabled' if a.correta }}>
+      <span class="letra">{{ a.letra }}</span>
+      <span>{{ a.texto }}{% if a.correta %} <span class="badge ativo">gabarito atual</span>{% endif %}</span>
+    </label>
+  {% endfor %}
+  <div class="acoes-form">
+    <button class="br-button primary" type="submit">Trocar gabarito</button>
+    <a class="br-button secondary" href="{{ url_for('admin.questionarios_detalhe', questionario_id=q.id) }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

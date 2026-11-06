@@ -1,0 +1,32 @@
+# Sobre a sua participação
+- Este jogo faz parte de uma pesquisa da instituição sobre os conhecimentos dos estudantes.
+- A participação é voluntária e anônima: você não informa nome, e-mail nem matrícula, e nenhuma resposta é ligada a você.
+- As respostas são analisadas apenas em conjunto (por turma, curso e campus) para melhorar o ensino e os materiais de apoio.
+- Você pode parar a qualquer momento, fechando o jogo. Partidas que não forem concluídas não são guardadas.
+- Ao continuar, você concorda em participar.
+
+# Bem-vindo(a) ao {{titulo}}
+Você é um(a) estudante explorando o Hub de Inovação Digital da {{instituicao}}. Este é um jogo de avaliação formativa: o objetivo é aprender, não apenas pontuar.
+
+# Como jogar
+- Na escolha do avatar, digite seu nome e pressione Tab para ir aos avatares: as teclas de 1 a 9 (ou as setas) escolhem, e Tab volta ao campo do nome.
+- Leia o enunciado no topo da tela. O selo acima dele indica o grupo (tema) da pergunta.
+- Cada porta representa uma alternativa. Escolha uma e atravesse a eclusa.
+- Com o mouse ou toque: clique na porta desejada e seu avatar caminha até ela.
+- Com o teclado: use as setas para andar; diante de uma porta, pressione Enter ou Espaço para confirmar. Também é possível apertar a letra da alternativa (A, B, C ou D): o avatar vai até a porta e a escolhe.
+- Se a pergunta tiver o botão DICA, clique nele (ou tecle H) para ler uma orientação. A dica não custa XP.
+
+# Regras
+- São {{totalPerguntas}} perguntas, cada uma com uma única tentativa. Ao cruzar a porta, a resposta é gravada.
+- Resposta correta vale {{pontosCorreta}} {{sigla}}; resposta incorreta vale {{pontosIncorreta}} {{sigla}}, pela participação. Sua pontuação aparece no canto superior direito, ao lado do ícone de moeda.
+- Depois de cada resposta, seu avatar reage: comemora se acertou e coça a cabeça, pensativo, se errou. Pressione Enter ou clique para pular a reação. No final, o pódio mostra seu XP e a revisão completa com o gabarito e a explicação de cada questão.
+
+Boa jornada!
+
+# Acessibilidade
+- Tecla M (ou o botão de som, no canto da tela): liga ou desliga o som.
+- Tab e Shift+Tab percorrem os botões da tela (um contorno amarelo mostra o botão em foco); Enter ou Espaço ativam.
+- Tecla R: repete o último aviso falado para leitores de tela.
+- Teclas + e - (ou o botão A+): aumentam ou reduzem o tamanho do texto.
+- Se o seu sistema estiver configurado para reduzir animações, o jogo evita confete, pulsos e transições em blocos.
+- Leitores de tela recebem avisos sobre a pergunta, as portas e o resultado.

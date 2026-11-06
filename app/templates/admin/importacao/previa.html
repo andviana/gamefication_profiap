@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block titulo %}Prévia da importação{% endblock %}
+{% block conteudo %}
+<h1>Prévia da importação</h1>
+<p class="sub">Os arquivos estão corretos. Confira o que será criado e confirme. <strong>Ainda não foi gravado nada.</strong></p>
+
+<div class="br-message success" role="status" style="margin-bottom:16px">
+  <div class="icon"><i class="fas fa-check-circle fa-lg" aria-hidden="true"></i></div>
+  <div class="content">Será criado o questionário <strong>“{{ previa.nome }}”</strong> (rascunho) com
+    <strong>{{ previa.analise.perguntas|length }} perguntas</strong> e <strong>{{ previa.analise.n_alternativas }} alternativas</strong>.</div>
+</div>
+
+{% if previa.analise.avisos %}
+<div class="br-message warning" role="note" style="margin-bottom:16px">
+  <div class="icon"><i class="fas fa-exclamation-triangle fa-lg" aria-hidden="true"></i></div>
+  <div class="content"><strong>Avisos (não impedem a importação):</strong>
+    <ul style="margin:6px 0 0 18px">{% for a in previa.analise.avisos %}<li>{{ a.arquivo }}{% if a.linha %}:{{ a.linha }}{% endif %}: {{ a.mensagem }}</li>{% endfor %}</ul></div>
+</div>
+{% endif %}
+
+<div class="grade-2" style="margin-bottom:16px">
+  <div class="cartao">
+    <h2>Grupos novos ({{ previa.grupos_novos|length }})</h2>
+    {% if previa.grupos_novos %}<p>{% for g in previa.grupos_novos %}<span class="badge superadmin">{{ g }}</span> {% endfor %}</p>{% else %}<p class="dica">Nenhum: todos já existem.</p>{% endif %}
+  </div>
+  <div class="cartao">
+    <h2>Grupos que já existem ({{ previa.grupos_existentes|length }})</h2>
+    {% if previa.grupos_existentes %}<p>{% for g in previa.grupos_existentes %}<span class="badge comum">{{ g }}</span> {% endfor %}</p>{% else %}<p class="dica">Nenhum.</p>{% endif %}
+  </div>
+</div>
+
+<div class="cartao" style="margin-bottom:16px">
+  <h2>Perguntas</h2>
+  <div class="tabela-wrap">
+    <table class="dados">
+      <caption class="sr-only" style="position:absolute;left:-9999px">Perguntas que serão importadas</caption>
+      <thead><tr><th scope="col" class="num">Nº</th><th scope="col">Título</th><th scope="col">Grupo</th><th scope="col">Enunciado</th><th scope="col" class="num">Alt.</th><th scope="col">Gabarito</th></tr></thead>
+      <tbody>
+      {% for p in previa.analise.perguntas %}
+        <tr>
+          <td class="num">{{ p.numero }}</td><td><strong>{{ p.titulo }}</strong></td><td>{{ p.grupo }}</td>
+          <td class="enun">{{ p.texto|truncate(100) }}</td><td class="num">{{ p.alternativas|length }}</td>
+          <td>{% for a in p.alternativas if a.correta %}<span class="badge ativo">{{ a.letra }}</span>{% endfor %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('admin.importar_confirmar') }}" class="cartao">
+  {{ form.hidden_tag() }}
+  <p class="dica" style="margin-top:0">Esta prévia vale por {{ validade }} minutos e só pode ser confirmada uma vez. O questionário nasce com o texto padrão de orientações e com a estrutura livre.</p>
+  <div class="acoes-form" style="margin-top:0">
+    <button class="br-button primary" type="submit"><i class="fas fa-check" aria-hidden="true"></i> Confirmar importação</button>
+    <a class="br-button secondary" href="{{ url_for('admin.importar') }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

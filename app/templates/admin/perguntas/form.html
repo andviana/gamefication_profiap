@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block conteudo %}
+<p class="sub" style="margin-bottom:4px"><a href="{{ url_for('admin.questionarios_detalhe', questionario_id=q.id) }}">← {{ q.nome }}</a></p>
+<h1>{{ titulo }}</h1>
+
+{% if travado %}
+<div class="br-message warning" role="note" style="margin-bottom:16px">
+  <div class="icon"><i class="fas fa-lock fa-lg" aria-hidden="true"></i></div>
+  <div class="content">Este questionário já tem respostas. Você pode corrigir os <strong>textos</strong>, mas o número, o grupo, a quantidade de alternativas e o gabarito não mudam aqui.
+    Para o gabarito, um super admin usa “Trocar gabarito”; para o resto, duplique o questionário.</div>
+</div>
+{% endif %}
+
+<form method="post" novalidate class="cartao form-grade">
+  {{ form.hidden_tag() }}
+  <div class="grade-2">
+    <div>{{ campo(form.numero, "Fixo: o questionário já tem respostas." if travado else "Em branco = próximo número livre.", desativado=travado) }}</div>
+    <div>{{ campo(form.grupo_id, "Tema agrupador usado nos relatórios.", desativado=travado) }}</div>
+  </div>
+  {{ campo(form.titulo) }}
+  {{ campo(form.texto) }}
+  {{ campo(form.autoajuda, "Aparece no botão DICA do jogo, se preenchida.") }}
+
+  <h2 style="margin:8px 0 0">Alternativas</h2>
+  <p class="dica" style="margin:0">De 2 a 4 alternativas, preenchidas em ordem (A, B, C, D). Marque exatamente uma como correta.</p>
+  {% if form.correta.errors %}{% for msg in form.correta.errors %}<span class="feedback danger" role="alert"><i class="fas fa-times-circle" aria-hidden="true"></i>{{ msg }}</span>{% endfor %}{% endif %}
+
+  {% for i in range(n_linhas) %}
+    {% set bloqueada = travado and i >= n_existentes %}
+    <fieldset class="alt-bloco{{ ' desativada' if bloqueada }}">
+      <legend><span class="letra">{{ letras[i] }}</span></legend>
+      <label class="radio-correta"><input type="radio" name="correta" value="{{ i }}" {{ 'checked' if form.correta.data == i|string }} {{ 'disabled' if travado or bloqueada }}> É a alternativa correta</label>
+      {{ campo(form['alt_texto_' ~ i]) if not bloqueada else '' }}
+      {% if not bloqueada %}
+      <div class="grade-2">
+        <div>{{ campo(form['alt_acerto_' ~ i]) }}</div>
+        <div>{{ campo(form['alt_erro_' ~ i]) }}</div>
+      </div>
+      {% else %}<p class="dica">Sem alternativa {{ letras[i] }}: com respostas gravadas, não é possível acrescentar alternativas.</p>{% endif %}
+    </fieldset>
+  {% endfor %}
+
+  <div class="acoes-form">
+    <button class="br-button primary" type="submit">Salvar pergunta</button>
+    <a class="br-button secondary" href="{{ url_for('admin.questionarios_detalhe', questionario_id=q.id) }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

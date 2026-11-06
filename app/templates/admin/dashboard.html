@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block titulo %}Dashboard{% endblock %}
+{% block cabecalho %}<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">{% endblock %}
+{% block conteudo %}
+<div class="dash" id="dash" data-api="{{ url_for('admin.dash_questionarios').rsplit('/', 1)[0] }}">
+    <div class="page-head">
+      <div>
+        <h1>Dashboard de respostas</h1>
+        <p id="resumo-recorte" aria-live="polite"></p>
+      </div>
+      <label class="opcoes-vis"><input type="checkbox" id="decal"> Usar padrões nas barras (daltonismo e impressão)</label>
+    </div>
+    <div class="br-message danger erro-api" id="erro-api" role="alert" hidden><div class="icon"><i class="fas fa-times-circle fa-lg" aria-hidden="true"></i></div><div class="content" id="erro-api-texto"></div></div>
+
+    <!-- 0. questionário: obrigatório, sem padrão, antes de qualquer filtro -->
+    <section class="qsel" aria-labelledby="l-quest">
+      <div class="fld">
+        <label id="l-quest" for="f-questionario">Questionário <span class="obrig">obrigatório</span></label>
+        <select id="f-questionario" aria-describedby="qinfo"></select>
+      </div>
+      <div class="qinfo" id="qinfo" aria-live="polite"></div>
+    </section>
+
+    <section id="escolha" class="escolha" aria-labelledby="t-escolha">
+      <div class="vazio-q"><i class="fas fa-clipboard-list" aria-hidden="true"></i>
+        <h2 id="t-escolha">Escolha um questionário para começar</h2>
+        <p>Cada questionário tem suas próprias perguntas, por isso o dashboard mostra um de cada vez e não soma dados de questionários diferentes.</p></div>
+      <div class="cards-q" id="cards-q"></div>
+    </section>
+
+    <div id="painel" hidden>
+    <!-- 1. filtros, em uma linha, escopam tudo abaixo -->
+    <details class="filtros" id="filtros" open>
+      <summary><i class="fas fa-filter" aria-hidden="true"></i> Filtros</summary>
+      <div class="filtros-grid" role="group" aria-label="Filtros do dashboard">
+        <div class="fld"><label for="f-coleta">Coleta (código)</label><select id="f-coleta"></select></div>
+        <div class="fld"><label for="f-campus">Campus</label><select id="f-campus"></select></div>
+        <div class="fld"><label for="f-curso">Curso</label><select id="f-curso"></select></div>
+        <div class="fld"><label for="f-ano">Ano</label><select id="f-ano"></select></div>
+        <div class="fld"><label for="f-periodo">Período</label><select id="f-periodo"></select></div>
+        <div class="fld"><label for="f-grupo">Grupo</label><select id="f-grupo"></select></div>
+        <div class="fld"><label for="f-questao">Questão</label><select id="f-questao"></select></div>
+        <div class="fld"><label for="f-data">Data da partida</label><select id="f-data"></select></div>
+      </div>
+      <div class="intervalo" id="intervalo" role="group" aria-label="Intervalo de datas">
+        <div class="fld"><label for="f-de">De</label><input type="date" id="f-de"></div>
+        <div class="fld"><label for="f-ate">Até</label><input type="date" id="f-ate"></div>
+      </div>
+      <div class="chips" id="chips" aria-label="Filtros ativos"></div>
+    </details>
+
+    <!-- 2. KPIs -->
+    <section class="kpis" aria-label="Indicadores do recorte">
+      <div class="tile hero">
+        <div class="rot"><i class="fas fa-bullseye" aria-hidden="true"></i>% de acerto</div>
+        <div class="val" id="k-acerto">–</div>
+        <div class="meter" aria-hidden="true"><span id="k-meter" style="width:0"></span></div>
+        <div class="delta" id="k-delta"></div>
+      </div>
+      <div class="tile"><div class="rot"><i class="fas fa-user-group" aria-hidden="true"></i>Respondentes</div><div class="val" id="k-resp">–</div><div class="sub">partidas finalizadas</div></div>
+      <div class="tile"><div class="rot"><i class="fas fa-list-check" aria-hidden="true"></i>Respostas</div><div class="val" id="k-respostas">–</div><div class="sub" id="k-qtd-q"></div></div>
+      <div class="tile"><div class="rot"><span class="marca m-acerto" aria-hidden="true"></span>Acertos</div><div class="val" id="k-acertos">–</div><div class="sub" id="k-acertos-p"></div></div>
+      <div class="tile"><div class="rot"><span class="marca m-erro" aria-hidden="true"></span>Erros</div><div class="val" id="k-erros">–</div><div class="sub" id="k-erros-p"></div></div>
+      <div class="tile"><div class="rot"><i class="fas fa-stopwatch" aria-hidden="true"></i>Tempo mediano</div><div class="val" id="k-tempo">–</div><div class="sub">por resposta</div></div>
+    </section>
+
+    <!-- 3. questões e grupos -->
+    <div class="grid">
+      <section class="card-g c7" id="card-questoes" aria-labelledby="t-questoes">
+        <header>
+          <div><h2 id="t-questoes">Questões com maior % de erro</h2><p class="subt" id="s-questoes"></p></div>
+          <div class="acoes">
+            <div class="seg" role="group" aria-label="Ordenar questões">
+              <button type="button" data-ord="erro" aria-pressed="true">Mais erros</button>
+              <button type="button" data-ord="acerto" aria-pressed="false">Mais acertos</button>
+            </div>
+            <button class="mini png" type="button" data-png title="Baixar o gráfico como imagem PNG"><i class="fas fa-image" aria-hidden="true"></i>PNG</button>
+            <button class="mini" type="button" data-tabela aria-pressed="false" title="Alternar entre gráfico e tabela"><i class="fas fa-table" aria-hidden="true"></i>Tabela</button>
+          </div>
+        </header>
+        <div class="chart" id="g-questoes" role="img" aria-label="Gráfico de barras: percentual de erro por questão"></div>
+        <div class="visao-tabela" id="vt-questoes"></div>
+      </section>
+      <section class="card-g c5" id="card-grupos" aria-labelledby="t-grupos">
+        <header>
+          <div><h2 id="t-grupos">% de erro por grupo</h2><p class="subt" id="s-grupos"></p></div>
+          <div class="acoes"><button class="mini png" type="button" data-png title="Baixar o gráfico como imagem PNG"><i class="fas fa-image" aria-hidden="true"></i>PNG</button>
+            <button class="mini" type="button" data-tabela aria-pressed="false"><i class="fas fa-table" aria-hidden="true"></i>Tabela</button></div>
+        </header>
+        <div class="chart" id="g-grupos" role="img" aria-label="Gráfico de barras: percentual de erro por grupo"></div>
+        <div class="visao-tabela" id="vt-grupos"></div>
+      </section>
+    </div>
+
+    <!-- 4. comparativo -->
+    <div class="grid">
+      <section class="card-g c6" id="card-comp" aria-labelledby="t-comp">
+        <header>
+          <div><h2 id="t-comp">Comparativo</h2><p class="subt" id="s-comp"></p></div>
+          <div class="acoes">
+            <div class="seg" role="group" aria-label="Comparar por">
+              <button type="button" data-dim="campus" aria-pressed="true">Campus</button>
+              <button type="button" data-dim="curso" aria-pressed="false">Curso</button>
+              <button type="button" data-dim="ano" aria-pressed="false">Ano</button>
+              <button type="button" data-dim="periodo" aria-pressed="false">Período</button>
+            </div>
+            <button class="mini png" type="button" data-png title="Baixar o gráfico como imagem PNG"><i class="fas fa-image" aria-hidden="true"></i>PNG</button>
+            <button class="mini" type="button" data-tabela aria-pressed="false"><i class="fas fa-table" aria-hidden="true"></i>Tabela</button>
+          </div>
+        </header>
+        <div class="chart" id="g-comp" role="img" aria-label="Gráfico de barras: percentual de erro por categoria"></div>
+        <div class="visao-tabela" id="vt-comp"></div>
+      </section>
+      <section class="card-g c6" id="card-heat" aria-labelledby="t-heat">
+        <header>
+          <div><h2 id="t-heat">Grupo × <span id="heat-dim">campus</span></h2><p class="subt" id="s-heat"></p></div>
+          <div class="acoes"><button class="mini png" type="button" data-png title="Baixar o gráfico como imagem PNG"><i class="fas fa-image" aria-hidden="true"></i>PNG</button>
+            <button class="mini" type="button" data-tabela aria-pressed="false"><i class="fas fa-table" aria-hidden="true"></i>Tabela</button></div>
+        </header>
+        <div class="chart" id="g-heat" role="img" aria-label="Mapa de calor: percentual de erro por grupo e categoria"></div>
+        <div class="visao-tabela" id="vt-heat"></div>
+      </section>
+    </div>
+
+    <!-- 5. detalhe da questão -->
+    <div class="grid">
+      <section class="card-g c12" id="card-det" aria-labelledby="t-det">
+        <header>
+          <div><h2 id="t-det">Detalhe da questão</h2><p class="subt" id="s-det"></p></div>
+          <div class="acoes"><button class="mini png" type="button" data-png title="Baixar o gráfico como imagem PNG"><i class="fas fa-image" aria-hidden="true"></i>PNG</button>
+            <button class="mini" type="button" data-tabela aria-pressed="false"><i class="fas fa-table" aria-hidden="true"></i>Tabela</button></div>
+        </header>
+        <div class="enunciado" id="det-enunciado"></div>
+        <div class="stats-q" id="det-stats"></div>
+        <div class="legenda" id="det-legenda"><span><span class="k" style="background:var(--d-acerto)"></span>✓ Alternativa correta</span><span><span class="k" style="background:var(--d-erro)"></span>✗ Alternativa incorreta</span></div>
+        <ol class="alt-lista" id="det-alts" aria-label="Alternativas da questão"></ol>
+        <div class="chart baixo" id="g-det" role="img" aria-label="Gráfico de barras: alternativas escolhidas na questão"></div>
+        <div class="visao-tabela" id="vt-det"></div>
+      </section>
+    </div>
+
+    <!-- 6. evolução -->
+    <div class="grid">
+      <section class="card-g c12" id="card-evo" aria-labelledby="t-evo">
+        <header>
+          <div><h2 id="t-evo">Partidas por dia</h2><p class="subt" id="s-evo"></p></div>
+          <div class="acoes">
+            <div class="seg" role="group" aria-label="Agrupar por">
+              <button type="button" data-gran="semana" aria-pressed="true">Por semana</button>
+              <button type="button" data-gran="dia" aria-pressed="false">Por dia</button>
+            </div>
+            <button class="mini png" type="button" data-png title="Baixar o gráfico como imagem PNG"><i class="fas fa-image" aria-hidden="true"></i>PNG</button>
+            <button class="mini" type="button" data-tabela aria-pressed="false"><i class="fas fa-table" aria-hidden="true"></i>Tabela</button>
+          </div>
+        </header>
+        <div class="chart baixo" id="g-evo" role="img" aria-label="Gráfico de linha: partidas finalizadas por dia"></div>
+        <div class="visao-tabela" id="vt-evo"></div>
+      </section>
+    </div>
+
+    <!-- 7. tabela de dados (obrigatória) -->
+    <section class="card-g" id="card-tab" aria-labelledby="t-tab">
+      <header>
+        <div><h2 id="t-tab">Tabela de dados</h2><p class="subt" id="s-tab">Segue todos os filtros acima; os totais conferem com os indicadores.</p></div>
+      </header>
+      <div class="tabs" role="tablist" aria-label="Agrupamento da tabela" id="tabs"></div>
+      <div class="barra-tab">
+        <div class="busca"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="busca" placeholder="Buscar na tabela" aria-label="Buscar na tabela"></div>
+        <button class="btn-ds" type="button" id="exportar"><i class="fas fa-file-csv" aria-hidden="true"></i>Exportar CSV do recorte</button>
+      </div>
+      <div class="tabela-wrap" id="tabela"></div>
+    </section>
+
+    <p class="rodape-nota">Respondente = partida finalizada. Como o jogo é anônimo, quem joga duas vezes conta duas vezes. % de erro = erros ÷ respostas do recorte (ponderado). Tempo = mediana.</p>
+    </div><!-- /painel -->
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/echarts/echarts.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

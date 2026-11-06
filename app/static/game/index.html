@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- O jogo é servido pelo Flask na raiz (/); os caminhos relativos abaixo partem desta pasta. -->
+  <base href="/static/game/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TechQuiz Campus - UFRA</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main id="game-container">
+    <canvas id="gameCanvas" width="1280" height="720" tabindex="0" aria-label="TechQuiz Campus: jogo educacional em Canvas"></canvas>
+    <!-- Campo real (fora da tela) que recebe a digitação do código da turma e do nome; o Canvas apenas o desenha. -->
+    <!-- Regiões ocultas para leitores de tela (ver js/a11y.js) -->
+    <div id="a11y-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+    <section id="a11y-review" class="sr-only" aria-label="Revisão das respostas" tabindex="-1"></section>
+    <input type="text" id="avatarNameInput" maxlength="15" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Nome do jogador">
+  </main>
+  <!-- Aviso exibido só em celulares/tablets em retrato (ver css/styles.css): o jogo é 16:9 e fica melhor na horizontal. -->
+  <div id="rotate-hint" role="alert">
+    <svg viewBox="0 0 64 64" width="96" height="96" aria-hidden="true" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="20" y="6" width="24" height="44" rx="4"/><circle cx="32" cy="43" r="1.5" fill="#58a6ff"/>
+      <path d="M10 56h44M46 50l8 6-8 6" />
+    </svg>
+    <div>Gire o aparelho para a horizontal</div>
+    <div class="rotate-sub">O TechQuiz Campus é em tela 16:9 e fica melhor na horizontal.</div>
+  </div>
+  <noscript>Este jogo requer JavaScript habilitado.</noscript>
+
+  <script src="config/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/avatars.js"></script>
+  <script src="js/a11y.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/screens.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

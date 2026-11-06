@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block conteudo %}
+<div class="centro">
+  <div class="cartao">
+    <h1>{{ titulo }}</h1>
+    {% if not alvo %}<p class="ajuda">O usuário é criado como <strong>usuário comum</strong>. Só o super admin raiz promove a super admin.</p>{% endif %}
+    <form method="post" novalidate class="form-grade">
+      {{ form.hidden_tag() }}
+      {{ campo(form.nome) }}
+      {{ campo(form.login, "De 3 a 40 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.") }}
+      {% if not alvo %}
+        {{ campo(form.senha, "Mínimo de 8 caracteres.") }}
+        {{ campo(form.confirmacao) }}
+      {% endif %}
+      <div class="acoes-form">
+        <button class="br-button primary" type="submit">{{ 'Criar usuário' if not alvo else 'Salvar' }}</button>
+        <a class="br-button secondary" href="{{ url_for('admin.usuarios_lista') }}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

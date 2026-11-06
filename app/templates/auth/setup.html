@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}Primeiro acesso{% endblock %}
+{% block conteudo %}
+<div class="centro">
+  <div class="cartao">
+    <h1>Primeiro acesso</h1>
+    <p class="ajuda">Ainda não existe nenhum usuário. Crie o <strong>super admin raiz</strong>: ele gerencia os demais usuários e não pode ser removido.
+      Esta página deixa de existir assim que o primeiro usuário for criado.</p>
+    <form method="post" novalidate class="form-grade">
+      {{ form.hidden_tag() }}
+      {{ campo(form.nome) }}
+      {{ campo(form.login, "De 3 a 40 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.") }}
+      {{ campo(form.senha, "Mínimo de 8 caracteres.") }}
+      {{ campo(form.confirmacao) }}
+      <div class="acoes-form"><button class="br-button primary block" type="submit">Criar super admin</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

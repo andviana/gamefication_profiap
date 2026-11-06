@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo, acao_post %}
+{% block titulo %}{{ info.plural }}{% endblock %}
+{% block conteudo %}
+<h1>Cadastros</h1>
+<p class="sub">Campus, cursos e grupos usados nas coletas e nas perguntas. Em uso, só se inativam; nada é apagado.</p>
+
+<div class="abas" role="tablist" aria-label="Tipo de cadastro">
+  {% for chave, t in tipos.items() %}
+    <a role="tab" href="{{ url_for('admin.cadastros', tipo=chave) }}" aria-selected="{{ 'true' if chave == tipo else 'false' }}">{{ t.plural }}</a>
+  {% endfor %}
+</div>
+
+<div class="cartao">
+  <form method="post" novalidate class="linha-form">
+    {{ form.hidden_tag() }}
+    <div class="grow">{{ campo(form.nome) }}</div>
+    <button class="br-button primary" type="submit"><i class="fas fa-plus" aria-hidden="true"></i> Cadastrar {{ info.singular }}</button>
+  </form>
+</div>
+
+<div class="cartao" style="margin-top:16px">
+  {% if itens %}
+  <div class="tabela-wrap">
+    <table class="dados">
+      <caption class="sr-only" style="position:absolute;left:-9999px">{{ info.plural }} cadastrados</caption>
+      <thead><tr><th scope="col">Nome</th><th scope="col">Situação</th><th scope="col">Em uso ({{ info.uso }})</th><th scope="col" style="text-align:right">Ações</th></tr></thead>
+      <tbody>
+      {% for r, usos in itens %}
+        <tr{% if not r.ativo %} class="inativo"{% endif %}>
+          <td>{{ r.nome }}</td>
+          <td><span class="badge {{ 'ativo' if r.ativo else 'comum' }}">{{ 'ativo' if r.ativo else 'inativo' }}</span></td>
+          <td>{{ usos }}</td>
+          <td class="acoes">
+            <a class="link-btn" href="{{ url_for('admin.cadastros_editar', tipo=tipo, ref_id=r.id) }}">Renomear</a>
+            <form method="post" action="{{ url_for('admin.cadastros_ativo', tipo=tipo, ref_id=r.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="ativo" value="{{ 0 if r.ativo else 1 }}">
+              <button type="submit" class="link-btn{{ ' perigo' if r.ativo }}">{{ 'Inativar' if r.ativo else 'Reativar' }}</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="vazio">Nenhum registro ainda. Cadastre o primeiro acima.</p>
+  {% endif %}
+</div>
+{% endblock %}

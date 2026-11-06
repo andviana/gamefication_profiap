@@ -1,0 +1,103 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  width: 100%;
+  height: 100%;
+  background: #0d1117;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #0d1117;
+}
+
+/*
+ * Área interna fixa em 1280x720 (definida no <canvas>). O CSS só a escala mantendo 16:9,
+ * ocupando o maior retângulo que cabe na janela (letterbox/pillarbox) e ampliando em telas grandes.
+ */
+#game-container {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: min(100vw, calc(100vh * 16 / 9));
+  max-width: 100vw;
+  max-height: 100vh;
+  box-shadow: 0 0 20px rgba(31, 111, 235, 0.3);
+}
+
+/* Moldura neon apenas decorativa, por cima do canvas: não altera a área de cliques. */
+#game-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid #1f6feb;
+  pointer-events: none;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #0d1117;
+  touch-action: none;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/*
+ * Campo do nome: recebe o foco e a digitação, mas fica fora da tela (display:none não recebe foco);
+ * o Canvas desenha o campo estilizado. Os estilos abaixo valem se o campo for exibido.
+ */
+#avatarNameInput {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  background: #161b22;
+  color: #58a6ff;
+  border: 1px solid #30363d;
+  font-family: "Courier New", Courier, monospace;
+  text-align: center;
+}
+
+/* Texto só para leitores de tela (fora da tela, mas presente na árvore de acessibilidade). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Aviso para girar o aparelho: só em telas de toque, em retrato e estreitas. */
+#rotate-hint {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  background: #0d1117;
+  color: #e6edf3;
+  font: 600 22px/1.4 "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+#rotate-hint .rotate-sub { font-weight: 400; font-size: 16px; color: #9db1c9; max-width: 320px; }
+#rotate-hint svg { animation: gire 2.6s ease-in-out infinite; }
+@keyframes gire { 0%, 20% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
+@media (prefers-reduced-motion: reduce) { #rotate-hint svg { animation: none; } }
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 900px) { #rotate-hint { display: flex; } }

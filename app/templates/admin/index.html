@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Início{% endblock %}
+{% block conteudo %}
+<h1>Olá, {{ current_user.nome.split()[0] }}</h1>
+<p class="sub">Painel de coleta de dados do TechQuiz.</p>
+
+<div class="cartoes">
+  <a class="cartao atalho" href="{{ url_for('admin.dashboard') }}">
+    <i class="fas fa-chart-column" aria-hidden="true"></i><h3>Dashboard</h3><span>Acertos, erros e deficiências por questão, grupo, campus e curso.</span>
+  </a>
+  {% if current_user.eh_superadmin %}
+  <a class="cartao atalho" href="{{ url_for('admin.usuarios_lista') }}">
+    <i class="fas fa-users" aria-hidden="true"></i><h3>Usuários</h3><span>Criar, editar e gerenciar quem acessa o painel.</span>
+  </a>
+  {% endif %}
+  <a class="cartao atalho" href="{{ url_for('auth.alterar_senha') }}">
+    <i class="fas fa-key" aria-hidden="true"></i><h3>Minha senha</h3><span>Alterar a senha da sua conta.</span>
+  </a>
+</div>
+
+{% endblock %}

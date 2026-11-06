@@ -1,0 +1,37 @@
+# /etc/systemd/system/techquiz.service
+[Unit]
+Description=TechQuiz Campus (painel e coleta) - gunicorn
+After=network-online.target postgresql.service
+Wants=network-online.target
+# Se o Postgres rodar em outro servidor, remova postgresql.service acima.
+
+[Service]
+Type=simple
+User=techquiz
+Group=techquiz
+WorkingDirectory=/opt/techquiz/app
+EnvironmentFile=/etc/techquiz/techquiz.env
+ExecStart=/opt/techquiz/venv/bin/gunicorn -c /opt/techquiz/app/deploy/gunicorn.conf.py wsgi:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+# o app falha ao subir se o schema do banco estiver desatualizado (rode "flask db upgrade" antes)
+TimeoutStartSec=60
+
+# Endurecimento: o serviço só lê o código e fala com o banco e a rede local.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

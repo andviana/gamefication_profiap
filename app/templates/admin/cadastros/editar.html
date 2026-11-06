@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}Renomear{% endblock %}
+{% block conteudo %}
+<div class="centro">
+  <div class="cartao">
+    <h1>Renomear {{ info.singular }}</h1>
+    <p class="ajuda">A mudança vale também para o histórico: coletas e perguntas que usam este registro passam a mostrar o novo nome.</p>
+    <form method="post" novalidate class="form-grade">
+      {{ form.hidden_tag() }}
+      {{ campo(form.nome) }}
+      <div class="acoes-form">
+        <button class="br-button primary" type="submit">Salvar</button>
+        <a class="br-button secondary" href="{{ url_for('admin.cadastros', tipo=tipo) }}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

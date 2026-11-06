@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "_macros.html" import acao_post %}
+{% block titulo %}{{ q.nome }}{% endblock %}
+{% block conteudo %}
+<p class="sub" style="margin-bottom:4px"><a href="{{ url_for('admin.questionarios_lista') }}">← Questionários</a></p>
+<div class="barra">
+  <div>
+    <h1 style="margin:0">{{ q.nome }} <span class="badge {{ resumo.estado|replace(' ', '-') }}" style="vertical-align:middle">{{ resumo.estado }}</span></h1>
+    {% if q.descricao %}<p class="sub" style="margin:4px 0 0">{{ q.descricao }}</p>{% endif %}
+    {% if derivado %}<p class="dica">Derivado de <a href="{{ url_for('admin.questionarios_detalhe', questionario_id=derivado.id) }}">{{ derivado.nome }}</a></p>{% endif %}
+  </div>
+  <div class="acoes-form" style="margin:0">
+    <a class="br-button secondary" href="{{ url_for('admin.questionarios_editar', questionario_id=q.id) }}">Editar dados</a>
+    <a class="br-button secondary" href="{{ url_for('admin.questionarios_orientacoes', questionario_id=q.id) }}">Orientações</a>
+    {% if resumo.estado != 'travado' %}<a class="br-button primary" href="{{ url_for('admin.perguntas_nova', questionario_id=q.id) }}"><i class="fas fa-plus" aria-hidden="true"></i> Nova pergunta</a>{% endif %}
+  </div>
+</div>
+
+<div class="br-message {{ 'info' if resumo.estado != 'travado' else 'warning' }}" role="note" style="margin-bottom:16px">
+  <div class="icon"><i class="fas {{ 'fa-info-circle' if resumo.estado != 'travado' else 'fa-lock' }} fa-lg" aria-hidden="true"></i></div>
+  <div class="content">{{ dica }}</div>
+</div>
+
+<div class="cartao">
+  <h2>Perguntas ({{ resumo.n_perguntas }})</h2>
+  {% if q.perguntas %}
+  <div class="tabela-wrap">
+    <table class="dados">
+      <caption class="sr-only" style="position:absolute;left:-9999px">Perguntas do questionário</caption>
+      <thead><tr><th scope="col" class="num">Nº</th><th scope="col">Título</th><th scope="col">Grupo</th><th scope="col">Enunciado</th><th scope="col" class="num">Alt.</th><th scope="col">Gabarito</th><th scope="col" style="text-align:right">Ações</th></tr></thead>
+      <tbody>
+      {% for p in q.perguntas %}
+        <tr>
+          <td class="num">{{ p.numero }}</td>
+          <td><strong>{{ p.titulo }}</strong></td>
+          <td>{{ p.grupo.nome }}</td>
+          <td class="enun">{{ p.texto|truncate(110) }}</td>
+          <td class="num">{{ p.alternativas|length }}</td>
+          <td>{% for a in p.alternativas if a.correta %}<span class="badge ativo">{{ a.letra }}</span>{% endfor %}</td>
+          <td class="acoes">
+            <a class="link-btn" href="{{ url_for('admin.perguntas_editar', questionario_id=q.id, pergunta_id=p.id) }}">Editar</a>
+            {% if resumo.estado == 'travado' and current_user.eh_superadmin %}
+              <a class="link-btn" href="{{ url_for('admin.perguntas_gabarito', questionario_id=q.id, pergunta_id=p.id) }}">Trocar gabarito</a>
+            {% endif %}
+            {% if resumo.estado != 'travado' %}
+              {{ acao_post(url_for('admin.perguntas_excluir', questionario_id=q.id, pergunta_id=p.id), 'Excluir', 'Excluir a pergunta ' ~ p.numero ~ '? Esta ação não pode ser desfeita.', 'link-btn perigo') }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="vazio">Nenhuma pergunta ainda. Use “Nova pergunta”{% if current_user.eh_superadmin %} ou <a href="{{ url_for('admin.importar') }}">importe os CSVs</a>{% endif %}.</p>
+  {% endif %}
+</div>
+
+<details class="cartao" style="margin-top:16px">
+  <summary><strong>Texto das orientações</strong> (o que o aluno lê antes de jogar)</summary>
+  <pre class="orient">{{ q.orientacoes }}</pre>
+</details>
+
+<div class="cartao" style="margin-top:16px">
+  <h2>Outras ações</h2>
+  <div class="acoes-form" style="margin-top:0">
+    {{ acao_post(url_for('admin.questionarios_duplicar', questionario_id=q.id), 'Duplicar como novo rascunho', 'Duplicar “' ~ q.nome ~ '”? Será criado um rascunho com as mesmas perguntas e orientações, sem coletas nem respostas.', 'br-button secondary') }}
+    {% if resumo.estado == 'rascunho' %}
+      {{ acao_post(url_for('admin.questionarios_excluir', questionario_id=q.id), 'Excluir questionário', 'Excluir o questionário “' ~ q.nome ~ '” e todas as suas perguntas? Esta ação não pode ser desfeita.', 'br-button secondary perigo') }}
+    {% endif %}
+  </div>
+  {% if resumo.estado != 'rascunho' %}<p class="dica">Só um rascunho (sem coletas) pode ser excluído.</p>{% endif %}
+</div>
+{% endblock %}

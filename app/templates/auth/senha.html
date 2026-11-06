@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}Alterar senha{% endblock %}
+{% block conteudo %}
+<div class="centro">
+  <div class="cartao">
+    <h1>Alterar minha senha</h1>
+    <p class="ajuda">As outras sessões abertas com a sua conta serão encerradas.</p>
+    <form method="post" novalidate class="form-grade">
+      {{ form.hidden_tag() }}
+      {{ campo(form.atual) }}
+      {{ campo(form.nova, "Mínimo de 8 caracteres.") }}
+      {{ campo(form.confirmacao) }}
+      <div class="acoes-form">
+        <button class="br-button primary" type="submit">Alterar senha</button>
+        <a class="br-button secondary" href="{{ url_for('admin.index') }}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titulo %}Questionários{% endblock %}
+{% block conteudo %}
+<div class="barra">
+  <div><h1>Questionários</h1><p class="sub" style="margin:0">Cada questionário reúne as perguntas e o texto de orientações que o aluno vê.</p></div>
+  <a class="br-button primary" href="{{ url_for('admin.questionarios_novo') }}"><i class="fas fa-plus" aria-hidden="true"></i> Novo questionário</a>
+</div>
+
+<div class="cartao">
+  {% if itens %}
+  <div class="tabela-wrap">
+    <table class="dados">
+      <caption class="sr-only" style="position:absolute;left:-9999px">Questionários cadastrados</caption>
+      <thead><tr><th scope="col">Nome</th><th scope="col">Estado</th><th scope="col" class="num">Perguntas</th><th scope="col" class="num">Coletas</th><th scope="col" class="num">Respostas</th><th scope="col">Criado em</th></tr></thead>
+      <tbody>
+      {% for q, r in itens %}
+        <tr>
+          <td><a href="{{ url_for('admin.questionarios_detalhe', questionario_id=q.id) }}"><strong>{{ q.nome }}</strong></a>
+            {% if q.derivado_de_id %}<div class="dica">derivado de outro questionário</div>{% endif %}</td>
+          <td><span class="badge {{ r.estado|replace(' ', '-') }}">{{ r.estado }}</span></td>
+          <td class="num">{{ r.n_perguntas }}</td><td class="num">{{ r.n_coletas }}</td><td class="num">{{ r.n_respostas }}</td>
+          <td>{{ q.criado_em|data_local }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="vazio">Nenhum questionário ainda. Crie o primeiro{% if current_user.eh_superadmin %}, ou <a href="{{ url_for('admin.importar') }}">importe os CSVs</a>{% endif %}.</p>
+  {% endif %}
+</div>
+{% endblock %}

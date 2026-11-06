@@ -1,0 +1,13 @@
+# /etc/systemd/system/techquiz-backup.timer   (systemctl enable --now techquiz-backup.timer)
+[Unit]
+Description=Backup semanal do banco do TechQuiz
+
+[Timer]
+# todo domingo, 03:00 (hora do servidor)
+OnCalendar=Sun *-*-* 03:00:00
+# se o servidor estava desligado no horário, roda assim que ligar
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target

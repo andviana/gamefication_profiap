@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}Orientações{% endblock %}
+{% block conteudo %}
+<h1>Orientações de “{{ q.nome }}”</h1>
+<p class="sub">Texto exibido ao aluno antes de escolher o personagem. Inclui o aviso de privacidade. Pode ser corrigido a qualquer momento.</p>
+<div class="cartao">
+  <form method="post" novalidate class="form-grade">
+    {{ form.hidden_tag() }}
+    {{ campo(form.orientacoes, "Formato: “# Título” abre uma seção, “- item” é um item de lista e uma linha em branco separa parágrafos. Valores entre chaves duplas, como {{ '{{totalPerguntas}}' }}, {{ '{{titulo}}' }} e {{ '{{instituicao}}' }}, são preenchidos pelo jogo.") }}
+    <div class="acoes-form">
+      <button class="br-button primary" type="submit">Salvar orientações</button>
+      <a class="br-button secondary" href="{{ url_for('admin.questionarios_detalhe', questionario_id=q.id) }}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

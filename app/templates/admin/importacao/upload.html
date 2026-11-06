@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}Importar questionário{% endblock %}
+{% block conteudo %}
+<h1>Importar questionário</h1>
+<p class="sub">Cria um <strong>questionário novo</strong>, em rascunho, a partir de dois arquivos CSV. Nada do que já existe é alterado ou apagado.</p>
+
+<div class="cartao" style="margin-bottom:16px">
+  <h2>Como preparar os arquivos</h2>
+  <ul class="proximas">
+    <li><strong>perguntas.csv</strong>: Número da pergunta · Pergunta · Título · Grupo · Autoajuda (a dica é opcional).</li>
+    <li><strong>alternativas.csv</strong>: Número da pergunta · Letra · Texto da alternativa · Correta ou incorreta · Texto de acerto · Texto de erro.</li>
+    <li>De <strong>2 a 4 alternativas</strong> por pergunta (letras A a D), com <strong>exatamente uma</strong> correta.</li>
+    <li>Codificação UTF-8 (no Excel: “CSV UTF-8”), separador <code>;</code> ou <code>,</code>, até 2 MB por arquivo.</li>
+    <li>Grupos novos são criados; grupos que já existem são reaproveitados.</li>
+  </ul>
+  <p class="dica" style="margin-top:10px">Modelos para baixar:
+    <a href="{{ url_for('admin.importar_modelo', arquivo='perguntas.csv') }}">modelo-perguntas.csv</a> ·
+    <a href="{{ url_for('admin.importar_modelo', arquivo='alternativas.csv') }}">modelo-alternativas.csv</a></p>
+</div>
+
+{% if erros %}
+<div class="br-message danger" role="alert" style="margin-bottom:16px">
+  <div class="icon"><i class="fas fa-times-circle fa-lg" aria-hidden="true"></i></div>
+  <div class="content"><strong>{{ n_erros }} problema{{ 's' if n_erros != 1 }} nos arquivos.</strong> Corrija e envie de novo; nada foi importado.</div>
+</div>
+<div class="cartao" style="margin-bottom:16px">
+  <div class="tabela-wrap">
+    <table class="dados">
+      <caption class="sr-only" style="position:absolute;left:-9999px">Problemas encontrados nos arquivos</caption>
+      <thead><tr><th scope="col">Arquivo</th><th scope="col" class="num">Linha</th><th scope="col">Problema</th></tr></thead>
+      <tbody>
+      {% for e in erros %}<tr><td>{{ e.arquivo }}</td><td class="num">{{ e.linha or '–' }}</td><td>{{ e.mensagem }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if n_erros > erros|length %}<p class="dica">Mostrando os primeiros {{ erros|length }} de {{ n_erros }}.</p>{% endif %}
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate class="cartao form-grade">
+  {{ form.hidden_tag() }}
+  {{ campo(form.nome) }}
+  {{ campo(form.descricao) }}
+  <div class="grade-2">
+    <div>{{ campo(form.arquivo_perguntas) }}</div>
+    <div>{{ campo(form.arquivo_alternativas) }}</div>
+  </div>
+  <p class="dica" style="margin:0">Por segurança, o navegador não guarda os arquivos entre uma tentativa e outra: selecione-os de novo se precisar reenviar.</p>
+  <div class="acoes-form">
+    <button class="br-button primary" type="submit"><i class="fas fa-magnifying-glass" aria-hidden="true"></i> Analisar arquivos</button>
+    <a class="br-button secondary" href="{{ url_for('admin.questionarios_lista') }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

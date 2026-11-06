@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}Entrar{% endblock %}
+{% block conteudo %}
+<div class="centro">
+  <div class="cartao">
+    <h1>Entrar</h1>
+    <p class="ajuda">Acesso restrito a quem administra a coleta de dados.</p>
+    <form method="post" novalidate class="form-grade">
+      {{ form.hidden_tag() }}
+      {{ campo(form.login) }}
+      {{ campo(form.senha) }}
+      <div class="acoes-form"><button class="br-button primary block" type="submit">Entrar</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}
