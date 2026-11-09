@@ -1,0 +1,70 @@
+# TechQuiz na VPS da Hostinger, atrás do Traefik que já existe lá: aplicação + PostgreSQL.
+# Só a aplicação entra na rede do Traefik; o banco fica em rede interna, sem porta publicada.
+# Guia completo: docs/DEPLOY_VPS_HOSTINGER.md  ·  Variáveis: .env.producao.example (copie para .env)
+name: techquiz
+
+services:
+  app:
+    build:
+      context: ${APP_BUILD_CONTEXT:-.}   # "." ao rodar na pasta clonada; ou a URL do Git ao criar o projeto pelo painel
+      dockerfile: Dockerfile
+    image: techquiz-app:${APP_VERSAO:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY (chave longa e secreta)}
+      GABARITO_SAL: ${GABARITO_SAL:?defina GABARITO_SAL (sal do gabarito)}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-techquiz}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-techquiz}
+      # O HTTPS termina no Traefik: o app confia em UM proxy para ler o IP real (rate limit) e o esquema https (cookie Secure, CSRF).
+      PROXIES_CONFIAVEIS: "1"
+      GUNICORN_BIND: 0.0.0.0:8000
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-3}
+      TIMEZONE: ${TIMEZONE:-America/Belem}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      INSTITUICAO_NOME: ${INSTITUICAO_NOME:-UFRA - Universidade Federal Rural da Amazônia}
+      INSTITUICAO_SUBTITULO: ${INSTITUICAO_SUBTITULO:-Programa de Pós-Graduação em Administração Pública - PROFIAP}
+      LOGO_INSTITUICAO: ${LOGO_INSTITUICAO:-img/logo_ufra.png}
+      LOGO_PROGRAMA: ${LOGO_PROGRAMA:-img/logo_pos.png}
+    networks:
+      - interna
+      - traefik
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_NETWORK:?defina TRAEFIK_NETWORK (nome da rede do Traefik)}
+      # roteador HTTPS do domínio
+      traefik.http.routers.techquiz.rule: Host(`${APP_DOMAIN:?defina APP_DOMAIN}`)
+      traefik.http.routers.techquiz.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+      traefik.http.routers.techquiz.tls: "true"
+      traefik.http.routers.techquiz.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      traefik.http.services.techquiz.loadbalancer.server.port: "8000"
+      # Os cabeçalhos de segurança (HSTS, CSP, X-Frame-Options...) já vêm do próprio app em produção.
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-techquiz}
+      POSTGRES_USER: ${POSTGRES_USER:-techquiz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+    volumes:
+      - pg-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - interna   # sem portas publicadas e fora do Traefik: o banco só é alcançável pela aplicação
+
+networks:
+  interna:
+    driver: bridge
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:?defina TRAEFIK_NETWORK}
+
+volumes:
+  pg-dados:

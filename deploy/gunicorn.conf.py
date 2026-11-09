@@ -16,6 +16,9 @@ keepalive = 5
 max_requests = 2000       # recicla o processo de vez em quando (contra vazamento de memória)
 max_requests_jitter = 200
 
+# Sem o socket de controle do gunicorn (ele tenta gravar no diretório do usuário, que o serviço e o contêiner não têm).
+control_socket_disable = True
+
 # Logs vão para o journald (stdout/stderr). O log de acesso não inclui o corpo (códigos e respostas) das requisições.
 accesslog = "-"
 errorlog = "-"

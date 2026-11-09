@@ -1,0 +1,22 @@
+# Fica fora da imagem: segredos, dados locais, testes e documentação.
+.git
+.gitignore
+.env
+.env.*
+!.env.producao.example
+.venv
+.pytest_cache
+__pycache__
+*.pyc
+instance
+*.db
+tests
+docs
+backups
+README*.md
+ESCOPO.md
+PLANO_ADMIN.md
+requirements-dev.txt
+.claude
+docker-compose*.yml
+Dockerfile

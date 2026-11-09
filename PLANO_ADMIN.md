@@ -350,6 +350,14 @@ Nenhuma pendência bloqueia a Fase 0. Ficam para a implementação apenas detalh
 
 Fase 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7. As fases 2, 3 e 4 podem ser entregues em sequência curta. A Fase 5 só começa com 1, 3 e 4 prontas, e a Fase 6 só com dados reais ou de teste da Fase 5. O protótipo visual do dashboard (6a) não depende do backend e pode ser feito em paralelo, a qualquer momento, para validar o design cedo.
 
+### Deploy na VPS da Hostinger, com Docker e Traefik (2026-11-09)
+
+Decisão posterior à Fase 7: além do deploy sem Docker (`deploy/`, `README_OPERACAO.md`), o sistema também roda em **Docker na VPS da Hostinger**, atrás do Traefik que já existe lá (modelo: o deploy de outro projeto do mesmo autor). Entregue: `Dockerfile` (Python 3.14, usuário sem privilégios), `docker-compose.prod.yml` (`app` + `db` PostgreSQL 17, rede interna, rótulos do Traefik, sem portas publicadas), `docker/` (entrypoint que espera o banco e roda `flask db upgrade`, healthcheck em `/saude`, backup semanal com retenção de 56 dias e teste de restauração), `.env.producao.example`, `.dockerignore` e o guia `docs/DEPLOY_VPS_HOSTINGER.md`. Sem MinIO (o sistema não guarda arquivos). **Setup:** mantido aberto, só por procedimento (decisão do usuário; sem código de instalação). 617 testes no SQLite (15 novos, `tests/test_docker.py`).
+
+Ensaiado localmente: imagem construída (275 MB, sem `.env` nem `tests`), pilha `healthy`, migrações automáticas, HTTPS pelo Traefik 3.6 com os cabeçalhos do app, setup e login, `X-Forwarded-For` forjado descartado pelo Traefik, backup e restauração em banco temporário (arquivo corrompido recusado). Corrigido no ensaio: o gunicorn tentava criar um socket de controle no diretório do usuário (`control_socket_disable = True`).
+
+**Pendências:** o Traefik real da VPS (nomes da rede, do entrypoint e do resolvedor), o DNS, a emissão do certificado e o redirecionamento HTTP→HTTPS só se confirmam lá; a sequência "restaurar de verdade" do guia não foi executada de ponta a ponta; o remoto do GitHub ainda não existe (o repositório é só local).
+
 ### Revisão final (2026-11-06)
 
 Conferido com o projeto pronto: 602 testes no SQLite e 607 no PostgreSQL (1 ignorado), 20 testes de Node, `flask db check` sem diferenças entre modelos e migrações, nenhum `TODO`/`print` esquecido, imports sem uso removidos. Corrigidos nesta revisão: seções 3, 4, 5 e R9 deste plano (estrutura de pastas, tokens do gabarito, SHA-256 de reserva, código 422, tentativas de envio); trechos de `ESCOPO.md`, `README.md`, `teste.html` e de um comentário do jogo que ainda falavam em duplo clique, `orientacoes.txt` e conversor; e o passo de cópia do `README_OPERACAO.md`, que levaria o `.env` de desenvolvimento para o servidor.

@@ -119,8 +119,9 @@ Em **produção** (`APP_ENV=production`) o app se recusa a subir se faltar `DATA
 
 ## Produção
 
-O procedimento completo (instalação, HTTPS, systemd, backup semanal, atualização, restauração e recuperação de acesso) está em
-**[README_OPERACAO.md](README_OPERACAO.md)**, para o setor de TI. Os modelos revisáveis ficam em [`deploy/`](deploy/): serviço
+Há dois caminhos de produção. **VPS da Hostinger com Docker e Traefik:** [docs/DEPLOY_VPS_HOSTINGER.md](docs/DEPLOY_VPS_HOSTINGER.md)
+(`Dockerfile`, `docker-compose.prod.yml`, `.env.producao.example`, `docker/`). **Servidor próprio sem Docker** (instalação, HTTPS, systemd,
+backup semanal, atualização, restauração e recuperação de acesso): **[README_OPERACAO.md](README_OPERACAO.md)**, para o setor de TI. Os modelos revisáveis ficam em [`deploy/`](deploy/): serviço
 do systemd, `gunicorn.conf.py`, site do Nginx, `techquiz.env.example`, backup (`techquiz-backup.sh` e timer semanal), teste de
 restauração e `smoke-test.sh` (verificação pós-deploy).
 

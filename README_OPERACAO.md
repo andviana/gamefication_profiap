@@ -4,6 +4,9 @@ Este guia leva um servidor Linux do zero até o sistema funcionando em produçã
 backup, restauração e recuperação de acesso. Os modelos de arquivo ficam em [`deploy/`](deploy/). O guia de desenvolvimento
 é o [README_ADMIN.md](README_ADMIN.md).
 
+> **Este guia é para instalar sem Docker** (systemd + Nginx) num servidor próprio. Para a **VPS da Hostinger com Docker e
+> Traefik**, siga o [docs/DEPLOY_VPS_HOSTINGER.md](docs/DEPLOY_VPS_HOSTINGER.md).
+
 ## 1. Como as peças se encaixam
 
 ```
