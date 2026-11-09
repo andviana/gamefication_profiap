@@ -30,7 +30,6 @@
       this.bootErrors = [];
       this.questions = [];        // chegam do servidor depois que o aluno informa o código da turma (loadQuiz)
       this.quizMeta = null;       // { codigo, questionarioId } da coleta em andamento
-      this.lastCode = '';         // último código digitado (só em memória): "Jogar novamente" já o traz preenchido
       this.resetData();
     }
 
@@ -79,7 +78,6 @@
         .map(q => ({ ...q, alternatives: q.alternatives.slice().sort((a, b) => a.letter.localeCompare(b.letter)) }))
         .sort((a, b) => a.id - b.id);
       this.quizMeta = { codigo, questionarioId: montado.questionarioId };
-      this.lastCode = codigo;
     }
 
     go(to) {
@@ -161,7 +159,7 @@
     }
 
     // "Jogar Novamente": limpa pontuação, histórico, nome, avatar e perguntas; volta para TITLE (o código é pedido de novo,
-    // já preenchido com o último).
+    // sempre com o campo vazio).
     restart() {
       this.resetData();
       this.questions = [];

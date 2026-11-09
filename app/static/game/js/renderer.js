@@ -297,46 +297,35 @@
     lines.slice(0, 4).forEach((ln, i) => pixelText(ctx, ln, cx, top + sh + 10 + i * 20, 16, '#89b8f5', 'center'));
   }
 
-  // Logo em uma caixa 3D isométrica (como os avatares): a logo fica na face frontal, com topo e lateral visíveis.
-  // As duas logos usam a MESMA altura de face; a largura acompanha a proporção de cada imagem.
-  // A caixa da universidade (à esquerda) é o ESPELHO HORIZONTAL da caixa do programa (à direita): a face sobe para a
-  // direita e a espessura aparece à esquerda; o desenho da logo é só inclinado, nunca invertido (o texto continua legível).
+  // Logo em um cartão plano (sem inclinação), de cantos arredondados, com sombra projetada, brilho azul e borda.
+  // A proporção da imagem é sempre preservada. As duas logos usam a MESMA altura de cartão; a largura acompanha cada imagem
+  // (e, se não couber na área, a logo é reduzida mantendo a proporção). Flutua de leve, como o resto da abertura.
   function drawLogo(ctx, kind, x, y, w, h) {
     const im = logos[kind];
     if (!im) { drawCrest(ctx, kind, x, y, w, h); return; }
-    const mir = kind === 'university';
-    const FH = Math.round(h * 0.65), m = 10, t = 22;                    // altura da face, margem interna e espessura da caixa
-    const ih = FH - 2 * m, iw = im.naturalWidth * ih / im.naturalHeight, Wf = iw + 2 * m;
-    const cs = 0.894, sn = 0.447;                                        // eixo da face: (1; 0,5), normalizado
-    const dx = Wf * cs, dy = Wf * sn, tx = t * cs, ty = t * sn;
-    const bob = reduced ? 0 : Math.sin(Date.now() / 700 + (mir ? 0 : 1.5)) * 4;   // flutua de leve
-    const totalW = dx + tx, totalH = ty + dy + FH;
-    const x0 = mir ? x + tx : x + w - totalW;                            // canto da face (esquerdo, ou direito do espelho)
-    const y0 = y + (h - totalH) / 2 + ty + bob;
-    let P0, P1, P2, P3, V, lado;
-    if (!mir) {                                                          // face desce para a direita; espessura à direita
-      P0 = [x0, y0]; P1 = [x0 + dx, y0 + dy]; P2 = [x0 + dx, y0 + dy + FH]; P3 = [x0, y0 + FH];
-      V = ([a, b]) => [a + tx, b - ty]; lado = [P1, V(P1), V(P2), P2];
-    } else {                                                             // espelhado: face sobe para a direita; espessura à esquerda
-      P0 = [x0, y0 + dy]; P1 = [x0 + dx, y0]; P2 = [x0 + dx, y0 + FH]; P3 = [x0, y0 + dy + FH];
-      V = ([a, b]) => [a - tx, b - ty]; lado = [P0, V(P0), V(P3), P3];
-    }
-    const cx = (mir ? x0 - tx : x0) + totalW / 2;
+    const m = 14, r = 20, CH = Math.round(h * 0.62);                     // margem interna, raio dos cantos, altura do cartão
+    let ih = CH - 2 * m, iw = im.naturalWidth * ih / im.naturalHeight;
+    if (iw + 2 * m > w) { iw = w - 2 * m; ih = im.naturalHeight * iw / im.naturalWidth; }
+    const cw = iw + 2 * m, ch = ih + 2 * m;
+    const bob = reduced ? 0 : Math.sin(Date.now() / 700 + (kind === 'university' ? 0 : 1.5)) * 3;
+    const cx0 = x + (w - cw) / 2, cy0 = y + (h - ch) / 2 + bob;
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,.35)';                                   // sombra no chão
-    ctx.beginPath(); ctx.ellipse(cx + (mir ? -6 : 6), y0 + FH + dy / 2 + 14 - bob, totalW * 0.55, 13, 0, 0, Math.PI * 2); ctx.fill();
-    const edge = 'rgba(120,180,255,.85)';
-    poly(ctx, lado, '#5a7392', edge, 2);                                 // lateral
-    poly(ctx, [P0, P1, V(P1), V(P0)], '#e6edf7', edge, 2);               // topo
-    ctx.shadowColor = 'rgba(88,166,255,.55)'; ctx.shadowBlur = 16;
-    poly(ctx, [P0, P1, P2, P3], '#ffffff', null);                        // face da logo
+    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 12;     // sombra projetada
+    const g = ctx.createLinearGradient(0, cy0, 0, cy0 + ch);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#e8f0fb');
+    rr(ctx, cx0, cy0, cw, ch, r); ctx.fillStyle = g; ctx.fill();
     ctx.restore();
-    ctx.save();                                                          // desenha a logo sobre o plano da face
-    if (!mir) { ctx.translate(x0, y0); ctx.transform(cs, sn, 0, 1, 0, 0); }
-    else { ctx.translate(x0, y0 + dy); ctx.transform(cs, -sn, 0, 1, 0, 0); }
-    ctx.drawImage(im, m, m, iw, ih);
+    ctx.save();                                                          // a logo, recortada dentro do cartão
+    rr(ctx, cx0, cy0, cw, ch, r); ctx.clip();
+    ctx.drawImage(im, cx0 + m, cy0 + m, iw, ih);
+    const brilho = ctx.createLinearGradient(0, cy0, 0, cy0 + ch * 0.5);  // reflexo suave no topo
+    brilho.addColorStop(0, 'rgba(255,255,255,.55)'); brilho.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = brilho; ctx.fillRect(cx0, cy0, cw, ch * 0.5);
     ctx.restore();
-    poly(ctx, [P0, P1, P2, P3], null, edge, 2);
+    ctx.save();                                                          // borda azul com brilho
+    ctx.shadowColor = 'rgba(88,166,255,.65)'; ctx.shadowBlur = 16;
+    rr(ctx, cx0, cy0, cw, ch, r); ctx.strokeStyle = 'rgba(120,180,255,.95)'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.restore();
   }
 
   // ---------- Piso do campus ----------

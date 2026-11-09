@@ -42,7 +42,7 @@ Os verdes de significado (ícone de acerto, borda de nome válido) e o vermelho 
 
 ### 2.3. Tipografia
 
-- **Títulos** (Abertura, Orientações, Identifique-se, Perfil, Dica, Parabéns, Revisão geral, faixa da reação): texto **nativo em alta resolução**, em negrito monoespaçado, com sombra rígida em degraus (efeito 3D de bloco, estilo "Minecraft") e contorno escuro. Cada título é pré-desenhado uma vez e copiado 1:1, então fica nítido em qualquer tamanho de janela. (A versão anterior ampliava pixels e ficava granulada.)
+- **Títulos** (Abertura, Orientações, Crie seu avatar, Dica, Ajuda, Parabéns, Revisão geral, faixa da reação): texto **nativo em alta resolução**, em negrito monoespaçado, com sombra rígida em degraus (efeito 3D de bloco, estilo "Minecraft") e contorno escuro. Cada título é pré-desenhado uma vez e copiado 1:1, então fica nítido em qualquer tamanho de janela. (A versão anterior ampliava pixels e ficava granulada.)
 - **Corpo e interface:** fonte sem serifa do sistema, com mínimo de 16 px.
 
 ## 3. Estrutura do projeto

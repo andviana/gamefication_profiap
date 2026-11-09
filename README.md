@@ -19,13 +19,13 @@ Abra `http://127.0.0.1:5000/`: o jogo é servido na raiz. O professor cadastra o
 
 ## Como jogar
 
-1. Na abertura, digite o **código da turma** (5 letras; o professor informa) e pressione Enter ou clique em **Iniciar**. O código é conferido no servidor: se estiver errado, desativado ou fora do prazo, a tela explica; muitos erros seguidos bloqueiam o computador por alguns minutos.
+1. Na abertura, o campo do **código da turma** está sempre vazio e já com o foco (borda verde neon e cursor piscando); o **?** ao lado do rótulo mostra a dica (passe o mouse ou toque). Digite o código (5 letras; o professor informa) e pressione Enter ou clique em **Iniciar**. O código é conferido no servidor: se estiver errado, desativado ou fora do prazo, a tela explica; muitos erros seguidos bloqueiam o computador por alguns minutos.
 2. Leia as orientações (incluem o aviso de privacidade) e continue.
-3. Digite seu nome (letras e números, sem espaços, acentos ou símbolos, até 15 caracteres), escolha um avatar (clique, setas, ou **Tab** e as teclas **1 a 9**) e confirme. O nome e o avatar ficam só na tela: **nunca são enviados**.
+3. Na tela **Crie seu avatar** o campo do nome já abre com o foco (borda verde neon e cursor piscando). Digite seu nome (letras e números, sem espaços, acentos ou símbolos, até 15 caracteres), escolha um avatar (clique, setas, ou **Tab** e as teclas **1 a 9**) e confirme. O botão **?** ao lado do **A+** abre a ajuda com todas as explicações. O nome e o avatar ficam só na tela: **nunca são enviados**.
 4. Em cada pergunta, leia o enunciado no topo e escolha uma porta. Cada porta é uma alternativa, identificada pela letra no display acima dela e pelo texto no rodapé.
 5. A resposta é gravada ao cruzar a porta, e **há uma única tentativa por pergunta**.
 6. Uma tela de reação mostra o resultado: o avatar comemora (acerto) ou coça a cabeça, pensativo (erro), e você vê o XP ganho. Enter, Espaço ou clique pulam a animação.
-7. Ao terminar, o jogo **envia as respostas ao servidor** (aparece "Salvando suas respostas…", com novas tentativas automáticas se a conexão falhar) e só então mostra o pódio e a revisão de cada pergunta. Se o envio falhar, o pódio avisa e oferece **Tentar enviar de novo**; se a coleta já tiver encerrado, o aviso diz que as respostas não foram salvas. **Jogar Novamente** volta à abertura, com o código já preenchido.
+7. Ao terminar, o jogo **envia as respostas ao servidor** (aparece "Salvando suas respostas…", com novas tentativas automáticas se a conexão falhar) e só então mostra o pódio e a revisão de cada pergunta. Se o envio falhar, o pódio avisa e oferece **Tentar enviar de novo**; se a coleta já tiver encerrado, o aviso diz que as respostas não foram salvas. **Jogar Novamente** volta à abertura, **sempre com o campo do código vazio**.
 
 O servidor guarda, por partida, só o código da turma, um identificador aleatório da partida e, para cada pergunta, a alternativa escolhida, o acerto (recalculado pelo servidor), a ordem e o tempo até escolher. **Não** guarda nome, avatar, XP nem IP.
 

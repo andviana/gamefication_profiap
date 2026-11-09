@@ -138,6 +138,12 @@
 
   function drawA11yButtons() {
     const a = a11yAnchor(), size = 44;
+    if (GS.current === S.AVATAR_SELECT) {                    // botão de ajuda (?) ao lado do A+: abre o modal com os textos de apoio
+      iconButton(a.x - size - 8, a.y, size, 'Ajuda', openHelp, (cx, cy) => {
+        ctx.fillStyle = CYAN; ctx.font = `bold 24px ${SANS}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('?', cx, cy + 1);
+      });
+    }
     iconButton(a.x, a.y, size, 'Tamanho do texto', cycleFont, (cx, cy) => {
       ctx.fillStyle = C.txt; ctx.font = `bold 22px ${SANS}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(fontLevel >= FONT_LEVELS.length - 1 ? 'A−' : 'A+', cx, cy + 1);
@@ -193,8 +199,10 @@
   // =====================================================================
   // O aluno não se identifica: digita só o código de 5 letras da turma, que o professor cadastrou no painel. O servidor confere
   // se a coleta existe e está no prazo e devolve o questionário (orientações e perguntas).
-  const CODE = { busy: false, erro: '', espera: 0, autoFocus: true };
-  const CODE_FIELD = { x: W / 2 - 230, y: 292, w: 460, h: 62 };
+  const CODE = { busy: false, erro: '', espera: 0, autoFocus: true, ajuda: 0 };
+  const AJUDA_CODIGO = 'Peça o código de 5 letras ao seu professor.';
+  const CODE_FIELD = { x: W / 2 - 230, y: 306, w: 460, h: 62 };
+  const NEON = '#39ff14';                                 // verde neon do campo do código
   const CODE_LEN = window.TQApi ? window.TQApi.TAMANHO_CODIGO : 5;
   const codigoDigitado = () => window.TQApi.normalizaCodigo(nameInput.value);
 
@@ -206,6 +214,16 @@
       nameInput.value = clean;
     } else if (CODE.erro) CODE.erro = '';          // digitou de novo: o aviso anterior já não vale
   }
+
+  // Esvazia o campo do código e devolve o foco a ele (depois de um código recusado).
+  function limpaCodigo() {
+    nameInput.value = ''; CODE.autoFocus = true; nameInput.focus();
+  }
+
+  // Voltar a esta página pelo histórico do navegador (cache de página) também não pode trazer o código antigo.
+  window.addEventListener('pageshow', ev => {
+    if (ev.persisted && GS.current === S.TITLE) limpaCodigo();
+  });
 
   async function submitCode() {
     if (Trans.active || CODE.busy || CODE.espera > 0) return;
@@ -219,6 +237,7 @@
         CODE.erro = bloqueado ? 'Muitas tentativas com código errado.' : r.mensagem;     // no bloqueio, só a contagem regressiva complementa
         CODE.espera = bloqueado ? (r.esperaSeg || 0) : 0;
         say(bloqueado ? `${CODE.erro} Aguarde ${r.esperaSeg || 0} segundos.` : r.mensagem); SoundSystem.playWrong();
+        limpaCodigo();                                       // código errado: o campo volta vazio e com o foco
         return;
       }
       const montado = await api.montaQuiz(r.dados);          // descobre a alternativa correta pelos tokens
@@ -228,21 +247,37 @@
       goTo(S.INSTRUCTIONS);
     } catch (e) {
       CODE.erro = 'Não foi possível carregar o questionário. Tente de novo.'; say(CODE.erro);
+      limpaCodigo();
     } finally { CODE.busy = false; }
   }
 
   function drawCodeField() {
-    const F0 = CODE_FIELD, val = codigoDigitado(), focused = document.activeElement === nameInput, completo = val.length === CODE_LEN;
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = C.mute; ctx.font = font(16, true);
-    ctx.fillText('CÓDIGO DA TURMA', F0.x, F0.y - 10);
-    R.drawPanel(ctx, F0.x, F0.y, F0.w, F0.h, { fill: 'rgba(13,17,23,.95)', stroke: completo ? '#3ddc84' : (focused ? CYAN : '#4b688f'), glow: focused ? 14 : 0, radius: 8 });
+    // Com o foco (ou enquanto ele ainda está sendo tomado, ao abrir) o campo mostra a borda verde neon e o prompt piscando.
+    const F0 = CODE_FIELD, val = codigoDigitado(), focused = document.activeElement === nameInput || (CODE.autoFocus && !CODE.busy), completo = val.length === CODE_LEN;
+    // rótulo centralizado com o campo, terminado por um "?" que mostra a dica ao passar o mouse, tocar ou clicar
+    const rotulo = 'CÓDIGO DA TURMA', RI = 11, GAP = 10;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.font = font(16, true);
+    const tw = ctx.measureText(rotulo).width, lx = W / 2 - (tw + GAP + 2 * RI) / 2, ly = F0.y - 12;
+    ctx.fillStyle = C.mute; ctx.fillText(rotulo, lx, ly);
+    const icx = lx + tw + GAP + RI, icy = ly - 6, box = [icx - RI - 5, icy - RI - 5, 2 * RI + 10, 2 * RI + 10];
+    const dica = inRect(mouse, ...box) || CODE.ajuda > 0 || KF.label === 'Ajuda do código';
+    ctx.save();
+    ctx.beginPath(); ctx.arc(icx, icy, RI, 0, Math.PI * 2);
+    ctx.fillStyle = dica ? CYAN : 'rgba(88,166,255,.18)'; ctx.fill();
+    ctx.strokeStyle = CYAN; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = dica ? '#0d1117' : CYAN; ctx.font = font(15, true); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('?', icx, icy + 1);
+    ctx.restore();
+    hit(...box, () => { CODE.ajuda = CODE.ajuda > 0 ? 0 : 8; nameInput.focus(); }, { label: 'Ajuda do código', say: AJUDA_CODIGO });
+    CODE.dica = dica ? { x: icx, y: icy - RI - 10 } : null;                 // o balão é desenhado por cima de tudo, em drawTitle
+    R.drawPanel(ctx, F0.x, F0.y, F0.w, F0.h, { fill: 'rgba(13,17,23,.95)', stroke: focused ? NEON : '#4b688f', glow: focused ? 18 : 0, radius: 8 });
     const slot = F0.w / CODE_LEN;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = font(36, true, MONO);
     for (let i = 0; i < CODE_LEN; i++) {
       const cx = F0.x + slot * (i + 0.5), cy = F0.y + F0.h / 2 + 2;
       if (val[i]) { ctx.fillStyle = '#ffffff'; ctx.fillText(val[i], cx, cy); }
       else { ctx.fillStyle = 'rgba(157,177,201,.45)'; ctx.fillRect(cx - 13, F0.y + F0.h - 16, 26, 3); }
-      if (i === val.length && focused && !completo && (reduced || Math.floor(T * 2) % 2 === 0)) { ctx.fillStyle = CYAN; ctx.fillRect(cx - 1, F0.y + 12, 3, F0.h - 28); }
+      if (i === val.length && focused && !completo && (reduced || Math.floor(T * 2) % 2 === 0)) { ctx.fillStyle = NEON; ctx.fillRect(cx - 1, F0.y + 12, 3, F0.h - 28); }
     }
     hit(F0.x, F0.y, F0.w, F0.h, () => nameInput.focus());
     // mensagem logo abaixo do campo
@@ -251,9 +286,9 @@
     if (CODE.busy) { msg = 'Validando o código…'; col = CYAN; }
     else if (CODE.espera > 0) { msg = `${CODE.erro} Aguarde ${Math.ceil(CODE.espera)} s para tentar de novo.`; col = C.warn; }
     else if (CODE.erro) { msg = CODE.erro; col = C.warn; }
-    else msg = 'Peça o código de 5 letras ao seu professor.';
+    else msg = '';                                  // sem texto fixo: a dica fica no "?" do rótulo
     ctx.fillStyle = col;
-    R.wrap(ctx, msg, 780).slice(0, 2).forEach((l, i) => ctx.fillText(l, W / 2, F0.y + F0.h + 28 + i * Math.round(F(17) * 1.25)));
+    if (msg) R.wrap(ctx, msg, 780).slice(0, 2).forEach((l, i) => ctx.fillText(l, W / 2, F0.y + F0.h + 28 + i * Math.round(F(17) * 1.25)));
   }
 
   function drawTitle() {
@@ -263,12 +298,10 @@
     R.pixelText(ctx, CFG.interface.gameTitle, W / 2, 60, 66, CYAN, 'center');
     const k = FONT_LEVELS[fontLevel] - 1;
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = C.mute; ctx.font = font(22);
-    ctx.fillText('Avaliação formativa gamificada · Campus Tecnológico', W / 2, 168);
     ctx.fillStyle = C.txt; ctx.font = font(21, true);
-    ctx.fillText(CFG.institution.name, W / 2, 218 + k * 40);
+    ctx.fillText(CFG.institution.name, W / 2, 170 + k * 40);
     ctx.fillStyle = C.mute; ctx.font = font(18);
-    ctx.fillText(CFG.institution.department, W / 2, 252 + k * 85);
+    ctx.fillText(CFG.institution.department, W / 2, 204 + k * 85);
     for (let i = 0; i < AV.catalog.length; i++) {        // elenco de avatares
       const x = W / 2 + (i - 4) * 112;
       AV.drawAvatar(ctx, x, 540, i, 'idle', 0, { scale: 0.9, t: VT + i * 0.7, face: i % 2 ? 'R' : 'L' });
@@ -277,8 +310,16 @@
     drawCodeField();
     const pronto = window.TQApi.codigoCompleto(codigoDigitado()) && !CODE.busy && CODE.espera <= 0;
     button(CODE.busy ? 'Validando…' : 'Iniciar', W / 2 - 150, 598, 300, 62, submitCode, { primary: true, fontSize: 28, enabled: pronto });
-    ctx.fillStyle = C.soft; ctx.font = font(16); ctx.textAlign = 'center';
-    ctx.fillText('Digite o código e pressione Enter ou clique em Iniciar', W / 2, 692);
+    if (CODE.dica) {                                                       // balão da dica, por cima dos outros elementos
+      ctx.font = font(17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const bw = ctx.measureText(AJUDA_CODIGO).width + 36, bh = 40, bx = clamp(CODE.dica.x - bw / 2, 12, W - bw - 12), by = CODE.dica.y - bh - 8;
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
+      R.drawPanel(ctx, bx, by, bw, bh, { fill: 'rgba(13,17,23,.98)', stroke: CYAN, radius: 10, lw: 2 });
+      ctx.restore();
+      ctx.beginPath(); ctx.moveTo(CODE.dica.x - 8, by + bh - 1); ctx.lineTo(CODE.dica.x + 8, by + bh - 1); ctx.lineTo(CODE.dica.x, by + bh + 9); ctx.closePath();
+      ctx.fillStyle = 'rgba(13,17,23,.98)'; ctx.fill();
+      ctx.fillStyle = C.txt; ctx.fillText(AJUDA_CODIGO, bx + bw / 2, by + bh / 2 + 1);
+    }
   }
 
   // =====================================================================
@@ -330,7 +371,51 @@
   //  AVATAR_SELECT - nome + avatar
   // =====================================================================
   const AVS = { sel: null, warn: '', warnT: 0, autoFocus: false };   // autoFocus: reaplica o foco no nome ao entrar na tela
-  const FIELD = { x: 340, y: 120, w: 600, h: 60 };
+  const FIELD = { x: 340, y: 134, w: 600, h: 64 };
+
+  // Textos de apoio da tela: ficam num modal, aberto pelo botão "?" ao lado do A+ (nada disso fica solto na tela).
+  const HELP = { open: false };
+  const HELP_AVATAR = [
+    ['Nome', `Use letras e números, sem espaços, acentos ou símbolos, com até ${CFG.userValidation.maxNameLength} caracteres.`],
+    ['Privacidade', 'O nome e o avatar aparecem só nesta tela do jogo: não são enviados nem gravados.'],
+    ['Avatar', 'Clique em um avatar, ou use as teclas de 1 a 9 (ou as setas ← →) para escolher.'],
+    ['Teclado', 'Tab vai do nome para os avatares e depois para os botões; Shift+Tab volta. Enter confirma.'],
+    ['Confirmar', 'O botão só habilita com um nome válido e um avatar escolhido.'],
+  ];
+  function openHelp() {
+    if (HELP.open || Trans.active) return;
+    HELP.open = true; KF.label = null; nameInput.blur(); SoundSystem.playHintClick();
+    say('Ajuda. ' + HELP_AVATAR.map(([t, x]) => `${t}: ${x}`).join(' '));
+  }
+  function closeHelp() {
+    if (!HELP.open) return;
+    HELP.open = false; AVS.autoFocus = true; SoundSystem.playHintClick(); say('Ajuda fechada.');      // devolve o foco ao campo do nome
+  }
+  function drawHelpModal() {
+    buttons.length = 0;
+    ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, W, H);
+    hit(0, 0, W, H, closeHelp);
+    const pw = 780, lh = Math.round(F(20) * 1.3), tw = pw - 72;
+    ctx.font = font(20);
+    const blocos = HELP_AVATAR.map(([t, x]) => ({ t, lines: R.wrap(ctx, x, tw - 176) }));
+    const corpo = blocos.reduce((h, b) => h + Math.max(1, b.lines.length) * lh + 16, 0);
+    const ph = Math.min(H - 60, 96 + corpo + 86), px = (W - pw) / 2, py = (H - ph) / 2;
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12;
+    R.drawPanel(ctx, px, py, pw, ph, { fill: 'rgba(22,27,34,.98)', glow: 18, radius: 16 });
+    ctx.restore();
+    hit(px, py, pw, ph, () => {});
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    R.pixelText(ctx, 'AJUDA', px + 36, py + 24, 32, CYAN);
+    ctx.fillStyle = 'rgba(88,166,255,.35)'; ctx.fillRect(px + 36, py + 78, pw - 72, 2);
+    let y = py + 112;
+    blocos.forEach(b => {
+      ctx.fillStyle = CYAN; ctx.font = font(18, true); ctx.fillText(b.t.toUpperCase(), px + 36, y);
+      ctx.fillStyle = C.txt; ctx.font = font(20);
+      b.lines.forEach((l, i) => ctx.fillText(l, px + 36 + 176, y + i * lh));
+      y += Math.max(1, b.lines.length) * lh + 16;
+    });
+    button('Entendi', px + pw - 196, py + ph - 70, 160, 48, closeHelp, { primary: true });
+  }
 
   function warnName(msg) { AVS.warn = msg; AVS.warnT = 3; say(msg); }
 
@@ -404,67 +489,41 @@
 
   function drawAvatarSelect() {
     R.drawBackground(ctx, VT);
-    R.pixelText(ctx, 'IDENTIFIQUE-SE', W / 2, 22, 40, CYAN, 'center');
+    R.pixelText(ctx, 'Crie seu avatar', W / 2, 36, 52, CYAN, 'center');
+    ctx.fillStyle = 'rgba(88,166,255,.45)'; ctx.fillRect(W / 2 - 110, 100, 220, 3);               // filete sob o título
+    const val = nameInput.value, valid = GS.validName(val);
+    // com o foco (ou enquanto ele ainda está sendo tomado, ao abrir) o campo mostra a borda verde neon e o prompt piscando
+    const focused = !HELP.open && (document.activeElement === nameInput || AVS.autoFocus);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = C.mute; ctx.font = font(16, true);
-    ctx.fillText('SEU NOME', FIELD.x, FIELD.y - 8);
-    const val = nameInput.value, valid = GS.validName(val), focused = document.activeElement === nameInput;
-    ctx.textAlign = 'right'; ctx.font = font(16);
-    ctx.fillText(focused ? 'Tab: ir aos avatares' : 'Shift+Tab: voltar ao nome', FIELD.x + FIELD.w, FIELD.y - 8);
-    ctx.textAlign = 'left';
+    ctx.fillText('SEU NOME', FIELD.x, FIELD.y - 10);
     R.drawPanel(ctx, FIELD.x, FIELD.y, FIELD.w, FIELD.h, {
-      fill: 'rgba(13,17,23,.95)', stroke: valid ? '#3ddc84' : (focused ? CYAN : '#4b688f'), glow: focused ? 14 : 0, radius: 8
+      fill: 'rgba(13,17,23,.95)', stroke: focused ? NEON : (valid ? '#3ddc84' : '#4b688f'), glow: focused ? 18 : 0, radius: 10
     });
     ctx.font = font(30, true, MONO); ctx.textBaseline = 'middle';
     if (val) {
-      ctx.fillStyle = '#ffffff'; ctx.fillText(val, FIELD.x + 20, FIELD.y + FIELD.h / 2 + 1);
-      if (focused && Math.floor(T * 2) % 2 === 0) {
-        ctx.fillStyle = CYAN; ctx.fillRect(FIELD.x + 22 + ctx.measureText(val).width, FIELD.y + 14, 3, 32);
+      ctx.fillStyle = '#ffffff'; ctx.fillText(val, FIELD.x + 22, FIELD.y + FIELD.h / 2 + 1);
+      if (focused && (reduced || Math.floor(T * 2) % 2 === 0)) {
+        ctx.fillStyle = NEON; ctx.fillRect(FIELD.x + 24 + ctx.measureText(val).width, FIELD.y + 15, 3, FIELD.h - 30);
       }
     } else {
-      ctx.fillStyle = C.mute; ctx.fillText('digite seu nome', FIELD.x + 20, FIELD.y + FIELD.h / 2 + 1);
+      ctx.fillStyle = 'rgba(157,177,201,.55)'; ctx.fillText('digite um nome', FIELD.x + 22 + (focused ? 10 : 0), FIELD.y + FIELD.h / 2 + 1);
+      if (focused && (reduced || Math.floor(T * 2) % 2 === 0)) { ctx.fillStyle = NEON; ctx.fillRect(FIELD.x + 22, FIELD.y + 15, 3, FIELD.h - 30); }   // o prompt pisca antes do texto
     }
     ctx.textAlign = 'right'; ctx.font = `16px ${MONO}`; ctx.fillStyle = C.mute;
-    ctx.fillText(`${val.length}/${CFG.userValidation.maxNameLength}`, FIELD.x + FIELD.w - 14, FIELD.y + FIELD.h / 2 + 1);
+    ctx.fillText(`${val.length}/${CFG.userValidation.maxNameLength}`, FIELD.x + FIELD.w - 16, FIELD.y + FIELD.h / 2 + 1);
     hit(FIELD.x, FIELD.y, FIELD.w, FIELD.h, () => nameInput.focus());
-    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center'; ctx.font = font(16);
-    ctx.fillStyle = AVS.warnT > 0 ? C.warn : C.mute;
-    const info = AVS.warnT > 0 ? AVS.warn : 'Letras e números, sem espaços, acentos ou símbolos.';
-    R.wrap(ctx, info, 640).slice(0, 3).forEach((l, i) => ctx.fillText(l, W / 2, FIELD.y + FIELD.h + 26 + i * Math.round(F(16) * 1.25)));   // entre os painéis laterais
-
-    // pré-visualização ampliada (2x), estática e de frente, do avatar selecionado
-    R.drawPanel(ctx, 40, 36, 260, 284, { fill: 'rgba(22,27,34,.7)', radius: 12 });
-    ctx.textAlign = 'center';
-    if (AVS.sel === null) {
-      ctx.fillStyle = C.mute; ctx.font = font(16);
-      ctx.fillText('Escolha um avatar', 170, 190);
-    } else AV.drawAvatar(ctx, 170, 306, AVS.sel, 'select', 0, { scale: 1 });
-
-    // ficha do perfil selecionado (a fonte diminui, até 16 px, para caber no painel)
-    R.drawPanel(ctx, 980, 36, 260, 284, { fill: 'rgba(22,27,34,.7)', radius: 12 });
-    ctx.textAlign = 'left';
-    R.pixelText(ctx, 'PERFIL', 1000, 52, 24, CYAN);
-    if (AVS.sel === null) {
-      const f = fitText('Clique em um avatar ou use as setas para escolher.', 220, 190, F(16), 16, false);
-      ctx.fillStyle = C.mute; ctx.font = `${f.size}px ${SANS}`;
-      f.lines.forEach((l, i) => ctx.fillText(l, 1000, 120 + i * f.lh));
-    } else {
-      const pf = AV.catalog[AVS.sel];
-      const t1 = fitText(String(AVS.sel + 1), 220, 70, F(34), 16, true);   // só o número
-      ctx.fillStyle = '#ffffff'; ctx.font = `bold ${t1.size}px ${SANS}`;
-      t1.lines.forEach((l, i) => ctx.fillText(l, 1000, 116 + i * t1.lh));
-      const top = 116 + t1.lines.length * t1.lh + 14;
-      const t2 = fitText(pf.desc, 220, 300 - top, F(16), 16, false);
-      ctx.fillStyle = C.soft; ctx.font = `${t2.size}px ${SANS}`;
-      t2.lines.forEach((l, i) => ctx.fillText(l, 1000, top + i * t2.lh));
+    if (AVS.warnT > 0) {                                  // só o aviso de erro de digitação aparece; as explicações ficam na ajuda (?)
+      ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center'; ctx.font = font(17); ctx.fillStyle = C.warn;
+      R.wrap(ctx, AVS.warn, 760).slice(0, 2).forEach((l, i) => ctx.fillText(l, W / 2, FIELD.y + FIELD.h + 30 + i * Math.round(F(17) * 1.25)));
     }
 
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = C.txt; ctx.font = font(18, true);
-    ctx.fillText('ESCOLHA SEU AVATAR', W / 2, 322);
-    const cw = 132, gap = 6, x0 = (W - (9 * cw + 8 * gap)) / 2, cy = 336, ch = 224;
+    ctx.fillText('ESCOLHA SEU AVATAR', W / 2, 296);
+    const cw = 132, gap = 6, x0 = (W - (9 * cw + 8 * gap)) / 2, cy = 312, ch = 232;
     const lift = (FONT_LEVELS[fontLevel] - 1) * 40;
-    const gridAtiva = !focused && !KF.label;
+    const gridAtiva = !document.activeElement || (document.activeElement !== nameInput && !KF.label && !AVS.autoFocus);
     if (gridAtiva) R.drawPanel(ctx, x0 - 6, cy - 6, 9 * cw + 8 * gap + 12, ch + 12, { fill: 'rgba(0,0,0,0)', stroke: CYAN, lw: 2, radius: 14, glow: 12 });   // grade ativa: 1 a 9 e setas escolhem
     AV.catalog.forEach((p, i) => {
       const x = x0 + i * (cw + gap), sel = AVS.sel === i, hov = inRect(mouse, x, cy, cw, ch);
@@ -472,20 +531,12 @@
         fill: sel ? 'rgba(20,59,110,.9)' : (hov ? 'rgba(18,41,70,.95)' : 'rgba(22,27,34,.9)'),
         stroke: sel ? '#a6caf8' : (hov ? CYAN : 'rgba(88,166,255,.35)'), glow: sel ? 16 : 0, lw: sel ? 3 : 2, radius: 10
       });
-      AV.drawAvatar(ctx, x + cw / 2, cy + 165 - lift, i, sel ? 'walking' : 'idle', VT * 8, { scale: 1, t: VT + i, face: sel ? 'R' : 'L' });
+      AV.drawAvatar(ctx, x + cw / 2, cy + 172 - lift, i, sel ? 'walking' : 'idle', VT * 8, { scale: 1, t: VT + i, face: sel ? 'R' : 'L' });
       ctx.fillStyle = sel ? '#ffffff' : C.soft; ctx.font = font(28, true); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';   // só o número (também é a tecla de atalho)
       ctx.fillText(String(i + 1), x + cw / 2, cy + ch - 12);
       hit(x, cy, cw, ch, () => selectAvatar(i));
     });
     button('Confirmar', W / 2 - 140, 574, 280, 56, startGame, { primary: true, enabled: canStart(), fontSize: 26 });
-    ctx.fillStyle = C.mute; ctx.font = font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    const hl = Math.round(F(16) * 1.3);
-    const dica = focused ? 'Digite o nome · Tab leva aos avatares (teclas 1 a 9 ou ← →)'
-      : KF.label ? 'Enter ou Espaço ativam o botão em foco · Tab segue · Shift+Tab volta'
-        : '1 a 9 ou ← → escolhem o avatar · Enter confirma · Tab segue para os botões';
-    const dl = R.wrap(ctx, dica, 900).slice(0, 2);
-    dl.forEach((l, i) => ctx.fillText(l, W / 2, 654 + F(16) - 16 + i * hl));
-    if (!canStart()) { ctx.fillStyle = C.warn; ctx.fillText(missingText(), W / 2, 654 + F(16) - 16 + dl.length * hl); }
     button('Voltar', 40, 640, 150, 48, () => goTo(S.INSTRUCTIONS));
   }
 
@@ -1083,14 +1134,13 @@
   //  Ciclo de vida e entrada
   // =====================================================================
   function onEnter(state) {
-    scr = null; drag = null; KF.label = null;
+    scr = null; drag = null; KF.label = null; HELP.open = false;
     if (state === S.TITLE) {
       nameInput.maxLength = CODE_LEN; nameInput.setAttribute('aria-label', 'Código da turma');
-      nameInput.value = GS.lastCode || '';                 // o mesmo campo recebe o código aqui e o nome na tela seguinte
-      CODE.erro = ''; CODE.busy = false; CODE.espera = 0;
-      const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-      CODE.autoFocus = !coarse;                            // em aparelhos de toque, o teclado virtual só abre quando o jogador tocar no campo
-      if (!coarse) nameInput.focus();
+      nameInput.value = '';                                // o campo do código SEMPRE abre vazio (ao abrir, recarregar, errar ou jogar de novo)
+      CODE.erro = ''; CODE.busy = false; CODE.espera = 0; CODE.ajuda = 0;
+      CODE.autoFocus = true;                               // o foco vai para o campo ao abrir (a rotina de update repete até conseguir)
+      nameInput.focus();
       say(`${CFG.interface.gameTitle}. Digite o código da turma, com 5 letras, e pressione Enter. Peça o código ao seu professor. Para ligar o som ou ajustar o texto, use a tecla Tab até os botões.`);
     }
     if (state === S.INSTRUCTIONS) {
@@ -1101,10 +1151,9 @@
       nameInput.maxLength = CFG.userValidation.maxNameLength; nameInput.setAttribute('aria-label', 'Nome do jogador');
       nameInput.value = '';                                // saiu o código; entra o nome
       AVS.warnT = 0;
-      const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-      AVS.autoFocus = !coarse;                 // em aparelhos de toque, o teclado virtual só abre quando o jogador tocar no campo
-      if (!coarse) nameInput.focus();
-      say('Identifique-se. Digite seu nome, com letras e números, até 15 caracteres. Pressione Tab para ir aos avatares e escolha com as teclas de 1 a 9 ou as setas. Enter confirma.');
+      AVS.autoFocus = true;                    // o foco vai para o campo do nome ao abrir (a rotina de update repete até conseguir)
+      nameInput.focus();
+      say('Crie seu avatar. Digite seu nome, com letras e números, até 15 caracteres. Pressione Tab para ir aos avatares e escolha com as teclas de 1 a 9 ou as setas. Enter confirma.');
     }
     if (state === S.QUIZ_PLAYING) initQuestion();
     if (state === S.ANSWER_FEEDBACK) initFeedback();
@@ -1151,6 +1200,7 @@
       // as demais teclas, como Backspace e letras, ficam livres para o campo de texto.
       const prevent = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k) || (k === ' ' && st !== S.AVATAR_SELECT) || (k === 'Tab' && st !== S.BOOT);
       keys[k] = true;
+      if (HELP.open) { if (confirm || k === 'Escape') closeHelp(); return true; }          // com a ajuda aberta, só fechar
       if (e.repeat && st !== S.INSTRUCTIONS && st !== S.PODIUM_REVIEW) return prevent;
 
       // Tab / Shift+Tab percorrem os botões; Enter ou Espaço ativam o botão em foco
@@ -1211,10 +1261,11 @@
       if (AVS.warnT > 0) AVS.warnT -= dt;
       Trans.update(dt);
       if (GS.current === S.TITLE && !Trans.active) {
+        if (CODE.ajuda > 0) CODE.ajuda = Math.max(0, CODE.ajuda - dt);                // a dica aberta por clique fecha sozinha
         if (CODE.espera > 0) CODE.espera = Math.max(0, CODE.espera - dt);             // contagem regressiva do bloqueio por tentativas
         if (CODE.autoFocus && !CODE.busy) { if (document.activeElement === nameInput) CODE.autoFocus = false; else nameInput.focus(); }
       }
-      if (AVS.autoFocus && GS.current === S.AVATAR_SELECT && !Trans.active) {      // garante o foco inicial no campo do nome
+      if (AVS.autoFocus && GS.current === S.AVATAR_SELECT && !Trans.active && !HELP.open) {      // garante o foco inicial no campo do nome
         if (document.activeElement === nameInput) AVS.autoFocus = false; else nameInput.focus();
       }
       if (GS.current === S.QUIZ_PLAYING && !Trans.active) updateQuestion(dt);
@@ -1233,6 +1284,7 @@
         case S.PODIUM_REVIEW: drawPodium(dt); break;
       }
       if (GS.current === S.TITLE || GS.current === S.INSTRUCTIONS || GS.current === S.AVATAR_SELECT) drawA11yButtons();
+      if (HELP.open && GS.current === S.AVATAR_SELECT) drawHelpModal();
       drawFocusRing();
       if (Trans.active) { if (reduced) R.drawFade(ctx, Trans.p()); else R.wipe(ctx, Trans.p()); }   // sem movimento: fade simples
     },

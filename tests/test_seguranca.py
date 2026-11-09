@@ -105,8 +105,6 @@ def test_os_templates_nao_tem_javascript_inline():
     achados = []
     for arq in list((raiz / "templates").rglob("*.html")) + [raiz / "static/game/index.html", raiz / "static/game/teste.html"]:
         html = arq.read_text(encoding="utf-8")
-        if arq.name == "teste.html":      # página de diagnóstico: roda com o script próprio, sem handler inline
-            continue
         for m in re.finditer(r"<script(?![^>]*\bsrc=)[^>]*>|\son[a-z]+\s*=|javascript:", html, flags=re.I):
             achados.append((arq.name, m.group(0)[:30]))
     assert not achados, achados

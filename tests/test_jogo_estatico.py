@@ -63,6 +63,8 @@ def _sem_comentarios(js: str) -> str:
 
 def test_o_jogo_nao_usa_armazenamento_do_navegador():
     for arquivo in (JOGO / "js").glob("*.js"):
+        if arquivo.name == "teste.js":        # o autoteste só LÊ o armazenamento, para provar que o jogo não grava nada
+            continue
         codigo = _sem_comentarios(arquivo.read_text(encoding="utf-8"))
         assert not re.search(r"localStorage|sessionStorage|document\.cookie|indexedDB", codigo), arquivo.name
 
@@ -76,3 +78,42 @@ def test_suite_de_testes_do_api_js_em_node():
     r = subprocess.run(["node", "--test", "tests/js/api.test.js"], cwd=RAIZ, capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-1500:]
     assert "fail 0" in r.stdout and "pass 20" in r.stdout
+
+
+def test_o_campo_do_codigo_sempre_abre_vazio_com_foco_e_borda_neon():
+    """Ao abrir, recarregar, errar o código ou jogar de novo, o campo está vazio e focado (borda verde neon, cursor piscando)."""
+    js = (RAIZ / "app/static/game/js/screens.js").read_text(encoding="utf-8")
+    estado = (RAIZ / "app/static/game/js/state.js").read_text(encoding="utf-8")
+    assert "lastCode" not in js and "lastCode" not in estado                      # o último código não é mais lembrado
+    abre = js.split("if (state === S.TITLE) {")[1].split("if (state === S.INSTRUCTIONS)")[0]
+    assert "nameInput.value = ''" in abre and "nameInput.focus()" in abre and "CODE.autoFocus = true" in abre
+    assert js.count("limpaCodigo()") >= 3                                         # erro do servidor, falha de rede e volta pelo histórico
+    assert "'pageshow'" in js and "const NEON = '#39ff14'" in js and "stroke: focused ? NEON" in js
+
+
+def test_tela_de_codigo_rotulo_centralizado_com_dica_e_logos_planas():
+    js = (RAIZ / "app/static/game/js/screens.js").read_text(encoding="utf-8")
+    renderer = (RAIZ / "app/static/game/js/renderer.js").read_text(encoding="utf-8")
+    assert "const rotulo = 'CÓDIGO DA TURMA'" in js and "W / 2 - (tw + GAP + 2 * RI) / 2" in js        # rótulo centralizado
+    assert "const AJUDA_CODIGO = 'Peça o código de 5 letras ao seu professor.'" in js and "inRect(mouse, ...box)" in js
+    assert "Digite o código e pressione Enter ou clique em Iniciar" not in js                       # sem texto sob o botão Iniciar
+    assert "Avaliação formativa gamificada" not in js                                              # sem a linha de subtítulo
+    assert "else msg = 'Peça o código" not in js                                                     # a dica fica só no "?"
+    logo = renderer.split("function drawLogo")[1].split("\n  }\n")[0]
+    assert "ctx.transform" not in logo and "isoBox" not in logo and "poly(" not in logo              # logo plana, sem inclinação
+    assert "rr(ctx, cx0, cy0, cw, ch, r)" in logo and "shadowBlur" in logo                          # cantos arredondados e sombra
+
+
+def test_tela_de_avatar_enxuta_com_ajuda_em_modal():
+    js = (RAIZ / "app/static/game/js/screens.js").read_text(encoding="utf-8")
+    tela = js.split("function drawAvatarSelect()")[1].split("QUIZ_PLAYING")[0]
+    assert "'Crie seu avatar'" in tela and "IDENTIFIQUE" not in js and "'digite um nome'" in tela and "digite seu nome" not in js
+    for removido in ("PERFIL", "Escolha um avatar'", "Clique em um avatar ou use as setas", "Letras e números, sem espaços, acentos ou símbolos.",
+                     "Tab: ir aos avatares", "Shift+Tab: voltar ao nome", "Digite o nome · Tab leva", "Para confirmar,"):
+        assert removido not in tela, removido
+    assert "stroke: focused ? NEON" in tela and "AVS.autoFocus" in tela                       # foco inicial: borda verde neon e prompt
+    onenter = js.split("if (state === S.AVATAR_SELECT) {")[1].split("if (state === S.QUIZ_PLAYING)")[0]
+    assert "AVS.autoFocus = true" in onenter and "nameInput.focus()" in onenter and "coarse" not in onenter
+    # o texto de apoio vive no modal de ajuda, aberto pelo "?" ao lado do A+
+    assert "function drawHelpModal" in js and "const HELP_AVATAR" in js and "iconButton(a.x - size - 8, a.y, size, 'Ajuda', openHelp" in js
+    assert "if (HELP.open) { if (confirm || k === 'Escape') closeHelp()" in js and "HELP.open && GS.current === S.AVATAR_SELECT) drawHelpModal()" in js
