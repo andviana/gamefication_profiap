@@ -85,14 +85,16 @@
       check('Lógica', 'Estados válidos: BOOT → TITLE → ... → PODIUM_REVIEW → TITLE', () => {
         const g = novo(); const S = g.STATES;
         igual(g.current, S.TITLE); g.go(S.INSTRUCTIONS); g.go(S.AVATAR_SELECT); g.startQuiz('Ana', 0);
+        igual(g.current, S.PHASE_INTRO, 'o prédio do primeiro grupo vem antes das perguntas'); g.beginPhase();
         igual(g.current, S.QUIZ_PLAYING); g.answer(g.currentQuestion, g.currentQuestion.alternatives[0]); g.go(S.ANSWER_FEEDBACK);
-        while (g.advance()) { g.answer(g.currentQuestion, g.currentQuestion.alternatives[0]); g.go(S.ANSWER_FEEDBACK); }
+        while (g.advance()) { if (g.current === S.PHASE_INTRO) g.beginPhase(); g.answer(g.currentQuestion, g.currentQuestion.alternatives[0]); g.go(S.ANSWER_FEEDBACK); }
         igual(g.current, S.PODIUM_REVIEW); g.restart(); igual(g.current, S.TITLE); return true;
       });
       check('Lógica', 'Transições inválidas lançam erro', () => {
         const g = novo(); const S = g.STATES;
         lanca(() => g.go(S.QUIZ_PLAYING), 'TITLE → QUIZ_PLAYING deveria falhar');
         g.go(S.INSTRUCTIONS); g.go(S.AVATAR_SELECT); g.startQuiz('Ana', 0);
+        lanca(() => g.go(S.ANSWER_FEEDBACK), 'PHASE_INTRO → ANSWER_FEEDBACK deveria falhar'); g.beginPhase();
         lanca(() => g.go(S.QUIZ_PLAYING), 'QUIZ_PLAYING → QUIZ_PLAYING deveria falhar');
         lanca(() => g.go(S.PODIUM_REVIEW), 'QUIZ_PLAYING → PODIUM_REVIEW deveria falhar');
         return true;
@@ -102,9 +104,11 @@
         const g = novo(); const ruins = ['', 'Ana Maria', 'José', 'ana_1', 'a-b', 'x'.repeat(16), 'Ana!', ' Ana'];
         const aceitos = ruins.filter(n => g.validName(n)); if (aceitos.length) throw new Error('aceitou: ' + JSON.stringify(aceitos)); return true;
       });
-      check('Lógica', 'Perguntas em ordem de número e alternativas em ordem de letra', () => {
+      check('Lógica', 'Fases: um grupo por fase, perguntas agrupadas (ordem do 1º aparecimento) e alternativas em ordem de letra', () => {
         const g = novo(); const ids = g.questions.map(q => q.id);
-        igual(ids, ids.slice().sort((a, b) => a - b), 'perguntas fora de ordem');
+        igual(ids, [1, 2, 4, 3], 'ordem de jogo: Segurança (1), Tecnologia (2 e 4), Gestão (3)');
+        igual(g.phases.map(f => [f.group, f.start, f.count]), [['Segurança Digital', 0, 1], ['Tecnologia', 1, 2], ['Gestão', 3, 1]], 'fases');
+        igual([g.phaseIndexOf(0), g.phaseIndexOf(2), g.phaseIndexOf(3)], [0, 1, 2], 'fase de cada pergunta');
         g.questions.forEach(q => { const l = q.alternatives.map(a => a.letter); igual(l, l.slice().sort(), 'alternativas fora de ordem na pergunta ' + q.id); }); return true;
       });
       check('Lógica', 'Pontuação: acerto e erro somam os valores da configuração', () => {
@@ -115,8 +119,8 @@
       });
       check('Lógica', 'Jogar Novamente zera nome, avatar, pontos e histórico', () => {
         const g = novo(); g.go(g.STATES.INSTRUCTIONS); g.go(g.STATES.AVATAR_SELECT); g.startQuiz('Ana', 4);
-        g.answer(g.currentQuestion, g.currentQuestion.alternatives[0]); g.go(g.STATES.ANSWER_FEEDBACK);
-        while (g.advance()) g.go(g.STATES.ANSWER_FEEDBACK); g.restart();
+        g.beginPhase(); g.answer(g.currentQuestion, g.currentQuestion.alternatives[0]); g.go(g.STATES.ANSWER_FEEDBACK);
+        while (g.advance()) { if (g.current === g.STATES.PHASE_INTRO) g.beginPhase(); g.go(g.STATES.ANSWER_FEEDBACK); } g.restart();
         igual([g.playerName, g.selectedAvatar, g.score, g.answersHistory.length, g.currentQuestionIndex], ['', null, 0, 0, 0]); return true;
       });
       check('Lógica', 'Avatares: 9 perfis, rótulos numerados e sem estereótipos', () => {
@@ -142,6 +146,18 @@
         }); return true;
       });
 
+      check('Lógica', 'Ambientes: 5 (centro de dados + 4 novos) e fases seguidas nunca repetem o ambiente', () => {
+        const R = IsoRenderer; igual(R.ENVIRONMENTS, ['datacenter', 'escritorio', 'sala', 'laboratorio', 'biblioteca'], 'ambientes');
+        for (let i = 0; i < 12; i++) if (R.envOf(i) === R.envOf(i + 1)) throw new Error('fases ' + i + ' e ' + (i + 1) + ' repetem o ambiente'); return true;
+      });
+      check('Telas', 'Cada ambiente e cada prédio desenham sem erro', () => {
+        const c = document.createElement('canvas'); c.width = 1280; c.height = 720; const g = c.getContext('2d'); const R = IsoRenderer;
+        R.ENVIRONMENTS.forEach(e => {
+          const portas = R.layoutDoors(4); R.drawBackground(g, 0); R.drawRoom(g, 1, portas.map(d => d.bx), e); R.drawDoors(g, 4, []); R.drawHintBox(g, 100, 500, 1, 0);
+          R.drawStreet(g, e, 1, 560); const b = R.drawBuilding(g, e, 640, 560, 0.5, 1); R.drawSign(g, 640, b.top - 56, 460, 150, 'FASE 1 DE 5', 'Princípios da Administração Pública', R.ENV_INFO[e].accent, 1);
+        }); return `${R.ENVIRONMENTS.length} ambientes`;
+      });
+
       // ---------------- Telas e fluxo completo (sem tela: usa um canvas fora da página) ----------------
       const cv = document.createElement('canvas'); cv.width = 1280; cv.height = 720;
       const campo = document.createElement('input');
@@ -161,15 +177,17 @@
         igual([GS.quizMeta.codigo, GS.totalQuestions], ['ABCDE', 4], 'questionário carregado'); vistos.add(GS.current); trilha.push(GS.current);
         kd('Enter'); ff(2); vistos.add(GS.current); trilha.push(GS.current);
         campo.value = 'Autoteste'; SM.onNameInput(); kd('4'); kd('Enter'); ff(2); vistos.add(GS.current); trilha.push(GS.current);
-        igual([GS.current, GS.playerName, GS.selectedAvatar], [S.QUIZ_PLAYING, 'Autoteste', 3], 'cadastro (trilha de estados: ' + trilha.join(' > ') + ')');
-        const n = GS.totalQuestions; let guard = 0;
+        igual([GS.current, GS.playerName, GS.selectedAvatar], [S.PHASE_INTRO, 'Autoteste', 3], 'cadastro (trilha de estados: ' + trilha.join(' > ') + ')');
+        const n = GS.totalQuestions; let guard = 0; const intros = [];
         while (GS.current !== S.PODIUM_REVIEW && guard++ < 4000) {
           vistos.add(GS.current);
           if (SM.inTransition) { ff(0.1); continue; }
+          if (GS.current === S.PHASE_INTRO) { const k = GS.currentPhaseIndex + ':' + GS.phaseIntroFirst; if (!intros.includes(k)) { intros.push(k); ff(1.2); } kd('Enter'); ff(0.2); continue; }   // vê a animação um pouco e pula
           if (GS.current === S.QUIZ_PLAYING && SM.Q.phase === 'play') { const dr = SM.Q.doors.find(d => d.alt.correct); SM.Q.a.gridX = dr.gx; SM.Q.a.gridY = 0.9; kd('Enter'); ff(0.2); }
           else ff(0.2);
         }
         vistos.add(GS.current);
+        igual(intros, ['0:true', '1:false', '2:false'], 'o prédio aparece antes de cada fase (sem "passou de fase" só na primeira)');
         igual([GS.current, GS.answersHistory.length, GS.score], [S.PODIUM_REVIEW, n, n * CFG.economy.pointsCorrect], 'resultado final');
         await ateQue(() => GS.saveStatus.estado === 'salvo', 'gravar a partida'); ff(1);         // o relatório só aparece depois de gravar
         Object.values(S).filter(s => s !== S.BOOT).forEach(s => { if (!vistos.has(s)) throw new Error('tela não visitada: ' + s); });
@@ -179,8 +197,8 @@
         igual(window.__envios.length, 1, 'um único envio'); const p = window.__envios[0];
         igual(Object.keys(p).sort(), ['codigo', 'respostas', 'uuid'], 'campos do envio'); igual(p.codigo, 'ABCDE');
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(p.uuid)) throw new Error('uuid inválido: ' + p.uuid);
-        igual(p.respostas.map(r => r.pergunta), [1, 2, 3, 4], 'perguntas'); igual(p.respostas.map(r => r.ordem), [1, 2, 3, 4], 'ordem');
-        igual(p.respostas.map(r => r.alternativa), ['C', 'B', 'A', 'D'], 'letras escolhidas (o teste acerta todas)');
+        igual(p.respostas.map(r => r.pergunta), [1, 2, 4, 3], 'perguntas (na ordem de jogo, agrupadas por fase)'); igual(p.respostas.map(r => r.ordem), [1, 2, 3, 4], 'ordem');
+        igual(p.respostas.map(r => r.alternativa), ['C', 'B', 'D', 'A'], 'letras escolhidas (o teste acerta todas)');
         p.respostas.forEach(r => { igual(Object.keys(r).sort(), ['alternativa', 'ordem', 'pergunta', 'tempo_ms'], 'campos de uma resposta'); if (!(Number.isInteger(r.tempo_ms) && r.tempo_ms >= 0)) throw new Error('tempo inválido ' + r.tempo_ms); });
         return true;
       });

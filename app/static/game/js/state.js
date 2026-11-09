@@ -8,6 +8,7 @@
     TITLE: 'TITLE',
     INSTRUCTIONS: 'INSTRUCTIONS',
     AVATAR_SELECT: 'AVATAR_SELECT',
+    PHASE_INTRO: 'PHASE_INTRO',          // o avatar entra no prédio do grupo (fase) antes das perguntas dele
     QUIZ_PLAYING: 'QUIZ_PLAYING',
     ANSWER_FEEDBACK: 'ANSWER_FEEDBACK',
     PODIUM_REVIEW: 'PODIUM_REVIEW'
@@ -17,9 +18,10 @@
     BOOT: ['TITLE'],
     TITLE: ['INSTRUCTIONS'],
     INSTRUCTIONS: ['TITLE', 'AVATAR_SELECT'],
-    AVATAR_SELECT: ['INSTRUCTIONS', 'QUIZ_PLAYING'],
+    AVATAR_SELECT: ['INSTRUCTIONS', 'PHASE_INTRO'],      // depois do avatar: o prédio do primeiro grupo
+    PHASE_INTRO: ['QUIZ_PLAYING'],
     QUIZ_PLAYING: ['ANSWER_FEEDBACK'],                 // ao cruzar a porta, vem a reação do avatar
-    ANSWER_FEEDBACK: ['QUIZ_PLAYING', 'PODIUM_REVIEW'],  // depois da reação: próxima pergunta ou pódio
+    ANSWER_FEEDBACK: ['QUIZ_PLAYING', 'PHASE_INTRO', 'PODIUM_REVIEW'],  // depois da reação: próxima pergunta, nova fase ou pódio
     PODIUM_REVIEW: ['TITLE']
   };
 
@@ -28,7 +30,8 @@
       this.STATES = STATES;
       this.current = STATES.BOOT;
       this.bootErrors = [];
-      this.questions = [];        // chegam do servidor depois que o aluno informa o código da turma (loadQuiz)
+      this.questions = [];        // chegam do servidor depois que o aluno informa o código da turma (loadQuiz), já agrupadas por fase
+      this.phases = [];           // uma fase por grupo: { index, group, start, count }
       this.quizMeta = null;       // { codigo, questionarioId } da coleta em andamento
       this.resetData();
     }
@@ -41,6 +44,7 @@
       this.score = 0;                 // soma de XP
       this.answersHistory = [];
       this.activeModalHint = false;   // popup de autoajuda aberto
+      this.phaseIntroFirst = true;    // a animação de entrada no prédio é a da primeira fase (sem o "você passou de fase!")
       this.partidaUuid = null;        // identifica a partida no servidor; reenviar o mesmo UUID nunca duplica
       this.saveStatus = { estado: 'idle' };   // 'enviando' | 'salvo' | 'erro' (ver salvarPartida)
     }
@@ -74,9 +78,18 @@
           throw new Error(`Pergunta ${q && q.id}: precisa de 2 a 4 alternativas e exatamente 1 correta.`);
         }
       });
-      this.questions = quiz
+      const ordenadas = quiz
         .map(q => ({ ...q, alternatives: q.alternatives.slice().sort((a, b) => a.letter.localeCompare(b.letter)) }))
         .sort((a, b) => a.id - b.id);
+      // Cada grupo é uma fase: as perguntas do grupo ficam juntas. Os grupos seguem a ordem da primeira pergunta de cada um e,
+      // dentro do grupo, a numeração. (O número da pergunta é o mesmo de sempre: só a ordem de jogo muda.)
+      const porGrupo = new Map();
+      ordenadas.forEach(q => { const g = (q.group || '').trim() || 'Geral'; if (!porGrupo.has(g)) porGrupo.set(g, []); porGrupo.get(g).push(q); });
+      this.questions = []; this.phases = [];
+      porGrupo.forEach((qs, group) => {
+        this.phases.push({ index: this.phases.length, group, start: this.questions.length, count: qs.length });
+        qs.forEach(q => this.questions.push({ ...q, group }));
+      });
       this.quizMeta = { codigo, questionarioId: montado.questionarioId };
     }
 
@@ -92,6 +105,11 @@
     }
 
     get totalQuestions() { return this.questions.length; }
+    get totalPhases() { return this.phases.length; }
+    phaseIndexOf(qIndex) { const i = this.phases.findIndex(f => qIndex >= f.start && qIndex < f.start + f.count); return i < 0 ? 0 : i; }
+    get currentPhaseIndex() { return this.phaseIndexOf(this.currentQuestionIndex); }
+    get currentPhase() { return this.phases[this.currentPhaseIndex]; }
+    isFirstOfPhase(qIndex) { return this.phases.some(f => f.start === qIndex); }
     get currentQuestion() { return this.questions[this.currentQuestionIndex]; }
     get lastAnswer() { return this.answersHistory[this.answersHistory.length - 1]; }
 
@@ -105,8 +123,12 @@
       this.activeModalHint = false;
       this.partidaUuid = window.TQApi.novoUuid();
       this.saveStatus = { estado: 'idle' };
-      this.go(STATES.QUIZ_PLAYING);
+      this.phaseIntroFirst = true;
+      this.go(STATES.PHASE_INTRO);       // o avatar entra no prédio do primeiro grupo; depois, beginPhase() leva às perguntas
     }
+
+    // Fim da animação do prédio: começam as perguntas da fase.
+    beginPhase() { this.go(STATES.QUIZ_PLAYING); }
 
     // Grava a resposta e acumula o XP; o feedback visual é mostrado no estado ANSWER_FEEDBACK.
     answer(question, alt, timeMs) {
@@ -134,13 +156,19 @@
       });
     }
 
-    // A partir de ANSWER_FEEDBACK: avança para a próxima pergunta ou, ao terminar, para o pódio. Retorna true se há mais.
+    // A partir de ANSWER_FEEDBACK: avança para a próxima pergunta, para a animação da nova fase (se o grupo mudou) ou, ao
+    // terminar, para o pódio. Retorna true se há mais perguntas.
     advance() {
       this.currentQuestionIndex++;
       this.activeModalHint = false;
       if (this.currentQuestionIndex >= this.questions.length) {
         this.go(STATES.PODIUM_REVIEW);
         return false;
+      }
+      if (this.isFirstOfPhase(this.currentQuestionIndex)) {
+        this.phaseIntroFirst = false;      // veio de uma fase anterior: a animação traz o "você passou de fase!"
+        this.go(STATES.PHASE_INTRO);
+        return true;
       }
       this.go(STATES.QUIZ_PLAYING);
       return true;
@@ -162,7 +190,7 @@
     // sempre com o campo vazio).
     restart() {
       this.resetData();
-      this.questions = [];
+      this.questions = []; this.phases = [];
       this.quizMeta = null;
       this.go(STATES.TITLE);
     }

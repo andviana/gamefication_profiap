@@ -422,13 +422,324 @@
     ctx.fillStyle = 'rgba(88,166,255,.35)'; ctx.fillRect(x0, y0 - 9, w, 2);
   }
 
-  // Sala completa: parede do fundo e piso. doorXs = posições (em pixels) das portas, para os racks desviarem delas.
-  function drawRoom(ctx, t, doorXs) {
-    drawWall(ctx, t, doorXs);
-    drawFloor(ctx, t);
+  // ---------- Ambientes (um por fase) ----------
+  // O jogo alterna os ambientes a cada grupo de perguntas. O primeiro é o centro de dados; os outros quatro são administrativos.
+  const ENVIRONMENTS = ['datacenter', 'escritorio', 'sala', 'laboratorio', 'biblioteca'];
+  const ENV_INFO = {
+    datacenter: { nome: 'Centro de dados', accent: '#58a6ff' },
+    escritorio: { nome: 'Escritório', accent: '#4cc3e0' },
+    sala: { nome: 'Sala de aula', accent: '#f2b84b' },
+    laboratorio: { nome: 'Laboratório', accent: '#5be3b0' },
+    biblioteca: { nome: 'Biblioteca', accent: '#d9a066' }
+  };
+  const envOf = i => ENVIRONMENTS[((i % ENVIRONMENTS.length) + ENVIRONMENTS.length) % ENVIRONMENTS.length];
+  const livre = (x, half, doorXs) => !(doorXs || []).some(d => Math.abs(d - x) < DOOR_W / 2 + half + 12);   // não esconde as portas
+  const circ = (ctx, x, y, r, fill) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); };
+
+  // Pisos dos ambientes novos (o do centro de dados é o drawFloor acima): carpete, tábuas, azulejo e parquet.
+  function drawFloorEnv(ctx, t, env) {
+    const x0 = ISO.OX, w = ISO.NX * ISO.U, y0 = ISO.OY, rows = 5, rh = ISO.NY * ISO.V / rows, th = 18, yF = y0 + rows * rh;
+    ctx.fillStyle = { escritorio: '#18233a', sala: '#33210f', laboratorio: '#22394a', biblioteca: '#2e1d10' }[env] || '#101c2b';
+    ctx.fillRect(x0, yF, w, th);
+    ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0, yF + th); ctx.lineTo(x0 + w, yF + th); ctx.stroke();
+    for (let j = 0; j < rows; j++) {
+      const ay = y0 + j * rh;
+      if (env === 'escritorio') {                                              // carpete em quadrados
+        for (let i = 0; i < ISO.NX; i++) {
+          const ax = x0 + i * ISO.U, h = hash(i, j);
+          ctx.fillStyle = shade('#3a4f6c', 0.84 + h * 0.3); ctx.fillRect(ax, ay, ISO.U, rh);
+          ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.strokeRect(ax + 0.5, ay + 0.5, ISO.U - 1, rh - 1);
+          if ((i + j) % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,.04)'; ctx.fillRect(ax + 5, ay + 5, ISO.U - 10, rh - 10); }
+        }
+        if (j === 2) { ctx.fillStyle = 'rgba(76,195,224,.14)'; ctx.fillRect(x0, ay + rh * 0.35, w, rh * 0.3); }   // faixa de corredor
+      } else if (env === 'sala') {                                             // tábuas de madeira
+        let x = x0 - hash(j, 1) * ISO.U * 3;
+        for (let k = 0; x < x0 + w; k++) {
+          const len = ISO.U * (3 + Math.floor(hash(j, k + 5) * 4)), h = hash(j + 9, k);
+          ctx.fillStyle = shade('#6b4526', 0.78 + h * 0.36); ctx.fillRect(Math.max(x, x0), ay, Math.min(len, x0 + w - x) + (x < x0 ? x - x0 : 0), rh);
+          ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x, ay, 2, rh);
+          ctx.fillStyle = 'rgba(255,230,190,.05)'; ctx.fillRect(Math.max(x, x0), ay + 3, len, 3);
+          x += len;
+        }
+        ctx.fillStyle = 'rgba(0,0,0,.38)'; ctx.fillRect(x0, ay + rh - 2, w, 2);
+      } else if (env === 'laboratorio') {                                      // azulejo grande e brilhante
+        for (let i = 0; i < ISO.NX; i += 2) {
+          const ax = x0 + i * ISO.U, h = hash(i, j);
+          ctx.fillStyle = shade('#46687f', 0.86 + h * 0.24); ctx.fillRect(ax, ay, ISO.U * 2, rh);
+          ctx.strokeStyle = 'rgba(214,238,252,.42)'; ctx.lineWidth = 2; ctx.strokeRect(ax + 1, ay + 1, ISO.U * 2 - 2, rh - 2);
+          poly(ctx, [[ax + 10, ay + rh - 4], [ax + 34, ay + 4], [ax + 46, ay + 4], [ax + 22, ay + rh - 4]], 'rgba(255,255,255,.07)');
+        }
+      } else {                                                                 // parquet
+        for (let i = 0; i < ISO.NX; i++) {
+          const ax = x0 + i * ISO.U, h = hash(i, j), horiz = (i + j) % 2 === 0;
+          for (let k = 0; k < 3; k++) {
+            ctx.fillStyle = shade('#76502d', 0.74 + hash(i * 3 + k, j) * 0.4);
+            if (horiz) ctx.fillRect(ax, ay + k * rh / 3, ISO.U, rh / 3 - 1); else ctx.fillRect(ax + k * ISO.U / 3, ay, ISO.U / 3 - 1, rh);
+          }
+          ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(ax, ay, 1, rh);
+          void h;
+        }
+      }
+    }
+    const sh = ctx.createLinearGradient(0, y0, 0, yF);
+    sh.addColorStop(0, 'rgba(4,10,20,.5)'); sh.addColorStop(0.45, 'rgba(4,10,20,.1)'); sh.addColorStop(1, 'rgba(4,10,20,0)');
+    ctx.fillStyle = sh; ctx.fillRect(x0, y0, w, yF - y0);
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0); ctx.stroke();
+  }
+
+  // Escritório: janelões com a cidade à noite, luminárias no teto e móveis de escritório (que desviam das portas).
+  function wallOffice(ctx, t, doorXs) {
+    const w = ISO.NX * ISO.U, y0 = ISO.OY;
+    const g = ctx.createLinearGradient(0, 0, 0, y0); g.addColorStop(0, '#1b2a42'); g.addColorStop(1, '#2d4262');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, y0);
+    const sky = ctx.createLinearGradient(0, 96, 0, 300); sky.addColorStop(0, '#08142b'); sky.addColorStop(1, '#1d3d6b');
+    ctx.fillStyle = sky; ctx.fillRect(0, 96, w, 204);
+    for (let b = 0, x = 0; x < w; b++, x += 38) {                                        // prédios ao fundo
+      const bh = 50 + hash(b, 3) * 110;
+      ctx.fillStyle = '#0b1a33'; ctx.fillRect(x, 300 - bh, 36, bh);
+      for (let r = 0; r < Math.floor(bh / 14); r++) for (let c = 0; c < 2; c++) if (hash(b * 7 + r, c) < 0.34) { ctx.fillStyle = 'rgba(255,212,120,.8)'; ctx.fillRect(x + 6 + c * 14, 300 - bh + 6 + r * 14, 8, 6); }
+    }
+    ctx.fillStyle = '#18243b'; for (let x = 0; x <= w; x += 94) ctx.fillRect(x - 2, 92, 4, 212);   // montantes
+    ctx.fillStyle = '#34496b'; ctx.fillRect(0, 92, w, 6); ctx.fillRect(0, 298, w, 8);
+    for (let x = 30; x < w; x += 140) { ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(x, 20, 72, 6); ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x - 8, 26, 88, 40); }
+    ctx.fillStyle = '#18253b'; ctx.fillRect(0, y0 - 34, w, 34); ctx.fillStyle = 'rgba(76,195,224,.4)'; ctx.fillRect(0, y0 - 34, w, 2);
+    for (let k = 0, x = 62; x < w - 40; x += 150, k++) {
+      if (!livre(x, 52, doorXs)) continue;
+      const kind = k % 3;
+      if (kind === 0) {                                                                  // planta
+        poly(ctx, [[x - 18, y0 - 34], [x + 18, y0 - 34], [x + 13, y0 - 4], [x - 13, y0 - 4]], '#6b4330');
+        [[-14, -66], [0, -86], [14, -62], [-6, -54], [8, -76]].forEach(([dx, dy], q) => { ctx.save(); ctx.translate(x + dx, y0 + dy); ctx.rotate((q - 2) * 0.4); ctx.fillStyle = q % 2 ? '#2f9a62' : '#23805a'; ctx.beginPath(); ctx.ellipse(0, 0, 8, 22, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); });
+      } else if (kind === 1) {                                                           // arquivo
+        ctx.fillStyle = '#8091a8'; ctx.fillRect(x - 30, y0 - 104, 60, 100); ctx.fillStyle = '#6a7b92';
+        for (let d = 0; d < 3; d++) { ctx.fillRect(x - 27, y0 - 100 + d * 32, 54, 29); ctx.fillStyle = '#cfd8e3'; ctx.fillRect(x - 10, y0 - 88 + d * 32, 20, 4); ctx.fillStyle = '#6a7b92'; }
+      } else {                                                                           // mesa com monitor
+        ctx.fillStyle = '#8a6a47'; ctx.fillRect(x - 52, y0 - 50, 104, 8); ctx.fillRect(x - 46, y0 - 42, 6, 38); ctx.fillRect(x + 40, y0 - 42, 6, 38);
+        ctx.fillStyle = '#10192a'; ctx.fillRect(x - 24, y0 - 92, 48, 34); ctx.fillStyle = 'rgba(88,166,255,.85)'; ctx.fillRect(x - 21, y0 - 89, 42, 28);
+        ctx.fillStyle = 'rgba(255,255,255,.7)'; for (let l = 0; l < 3; l++) ctx.fillRect(x - 17, y0 - 84 + l * 7, 14 + l * 5, 3);
+        ctx.fillStyle = '#10192a'; ctx.fillRect(x - 4, y0 - 58, 8, 8);
+      }
+    }
+  }
+
+  // Sala de aula: lousa verde com giz, relógio, carteiras, globo e estante.
+  function wallClass(ctx, t, doorXs) {
+    const w = ISO.NX * ISO.U, y0 = ISO.OY;
+    const g = ctx.createLinearGradient(0, 0, 0, y0); g.addColorStop(0, '#26403f'); g.addColorStop(1, '#3a5a56');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, y0);
+    ctx.fillStyle = '#6e4a2c'; ctx.fillRect(56, 96, w - 112, 184);                          // moldura da lousa
+    const bd = ctx.createLinearGradient(0, 104, 0, 272); bd.addColorStop(0, '#1d4a39'); bd.addColorStop(1, '#16382c');
+    ctx.fillStyle = bd; ctx.fillRect(64, 104, w - 128, 168);
+    ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fillRect(64, 104, w - 128, 22);
+    ctx.fillStyle = 'rgba(245,250,245,.62)'; ctx.font = 'bold 26px "Courier New", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ['a² + b² = c²', 'E = m·c²', '∑ n = n(n+1)/2', 'π ≈ 3,14159', 'f(x) = ax + b'].forEach((tx, i) => ctx.fillText(tx, 96 + (i % 2) * 400 + (i > 3 ? 120 : 0), 150 + Math.floor(i / 2) * 50));
+    ctx.fillStyle = '#8a6038'; ctx.fillRect(56, 276, w - 112, 8);
+    [[120, '#ffffff'], [150, '#f2c230'], [178, '#ff8fa3']].forEach(([x, c]) => { ctx.fillStyle = c; ctx.fillRect(x, 270, 18, 6); });
+    circ(ctx, w - 70, 56, 24, '#e9eef3'); ctx.strokeStyle = '#4a3220'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(w - 70, 56, 24, 0, Math.PI * 2); ctx.stroke();
+    const ang = (reduced ? 0 : t) * 0.4;
+    ctx.strokeStyle = '#1a2a3a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(w - 70, 56); ctx.lineTo(w - 70 + Math.cos(ang) * 16, 56 + Math.sin(ang) * 16); ctx.moveTo(w - 70, 56); ctx.lineTo(w - 70, 42); ctx.stroke();
+    ctx.fillStyle = '#2a3c3a'; ctx.fillRect(0, y0 - 34, w, 34); ctx.fillStyle = '#7a5532'; ctx.fillRect(0, y0 - 36, w, 4);
+    for (let k = 0, x = 62; x < w - 40; x += 150, k++) {
+      if (!livre(x, 50, doorXs)) continue;
+      if (k % 3 === 1) {                                                                 // globo
+        ctx.fillStyle = '#6a4a2a'; ctx.fillRect(x - 3, y0 - 36, 6, 30); ctx.fillRect(x - 18, y0 - 8, 36, 5);
+        circ(ctx, x, y0 - 62, 26, '#2f6f9f'); circ(ctx, x - 8, y0 - 66, 10, '#3f9a5a'); circ(ctx, x + 10, y0 - 54, 8, '#3f9a5a');
+        ctx.strokeStyle = '#c9a050'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y0 - 62, 29, Math.PI * 0.7, Math.PI * 1.9); ctx.stroke();
+      } else {                                                                           // carteira
+        ctx.fillStyle = '#b98b52'; ctx.fillRect(x - 36, y0 - 52, 72, 8); ctx.fillStyle = '#4a5666'; ctx.fillRect(x - 32, y0 - 44, 4, 40); ctx.fillRect(x + 28, y0 - 44, 4, 40);
+        ctx.fillStyle = '#e8edf2'; ctx.fillRect(x - 22, y0 - 62, 20, 10); ctx.fillStyle = '#d25f5f'; ctx.fillRect(x + 4, y0 - 60, 14, 8);
+      }
+    }
+  }
+
+  // Laboratório: parede de azulejo, prateleiras com vidrarias borbulhantes, monitor de gráficos e bancadas.
+  function wallLab(ctx, t, doorXs) {
+    const w = ISO.NX * ISO.U, y0 = ISO.OY;
+    const g = ctx.createLinearGradient(0, 0, 0, y0); g.addColorStop(0, '#1f3f50'); g.addColorStop(1, '#335f76');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, y0);
+    ctx.fillStyle = 'rgba(255,255,255,.07)'; for (let x = 0; x < w; x += 47) ctx.fillRect(x, 0, 1, y0); for (let y = 0; y < y0; y += 47) ctx.fillRect(0, y, w, 1);
+    ctx.fillStyle = 'rgba(190,240,225,.6)'; for (let x = 24; x < w; x += 160) ctx.fillRect(x, 16, 80, 6);                 // luz fluorescente
+    ctx.fillStyle = '#c9d6df'; ctx.fillRect(0, 214, w, 6);                                                       // prateleira alta
+    const cores = ['#4be3a6', '#58a6ff', '#ffb454', '#ff6f91'];
+    for (let k = 0, x = 40; x < w - 20; x += 62, k++) {
+      const c = cores[k % 4], hf = 28 + (k % 3) * 8;
+      ctx.fillStyle = 'rgba(220,240,250,.55)'; ctx.fillRect(x - 4, 214 - hf - 22, 8, 22);
+      circ(ctx, x, 214 - hf / 2 - 2, hf / 2, 'rgba(220,240,250,.28)');
+      ctx.save(); ctx.beginPath(); ctx.arc(x, 214 - hf / 2 - 2, hf / 2 - 2, 0, Math.PI * 2); ctx.clip(); ctx.fillStyle = c; ctx.globalAlpha = 0.85; ctx.fillRect(x - hf / 2, 214 - hf * 0.62, hf, hf); ctx.restore();
+      if (!reduced) for (let b = 0; b < 2; b++) { const f = ((t * 0.5 + k * 0.3 + b * 0.5) % 1); circ(ctx, x - 3 + b * 6, 214 - 6 - f * (hf - 8), 2, 'rgba(255,255,255,.7)'); }
+    }
+    ctx.fillStyle = '#0c1c2a'; ctx.fillRect(w - 290, 100, 200, 90); ctx.strokeStyle = 'rgba(91,227,176,.6)'; ctx.lineWidth = 2; ctx.strokeRect(w - 289, 101, 198, 88);
+    ctx.strokeStyle = 'rgba(91,227,176,.9)'; ctx.beginPath();
+    for (let i = 0; i <= 40; i++) { const px = w - 282 + i * 4.6, py = 146 + Math.sin(i * 0.5 + (reduced ? 0 : t * 2)) * 26; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke();
+    poly(ctx, [[64, 120], [90, 168], [38, 168]], '#f2c230'); ctx.fillStyle = '#1a1a1a'; ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', 64, 152);
+    ctx.fillStyle = '#1b3243'; ctx.fillRect(0, y0 - 34, w, 34);
+    for (let k = 0, x = 70; x < w - 40; x += 150, k++) {
+      if (!livre(x, 62, doorXs)) continue;
+      ctx.fillStyle = '#54707f'; ctx.fillRect(x - 56, y0 - 46, 112, 42); ctx.fillStyle = '#eef6fb'; ctx.fillRect(x - 60, y0 - 54, 120, 9);        // bancada
+      if (k % 2 === 0) {                                                                                                                 // microscópio
+        ctx.fillStyle = '#2c3a48'; ctx.fillRect(x - 20, y0 - 60, 40, 6); ctx.fillRect(x - 4, y0 - 100, 8, 42);
+        ctx.save(); ctx.translate(x, y0 - 96); ctx.rotate(-0.5); ctx.fillStyle = '#d7dee6'; ctx.fillRect(-6, -26, 12, 34); ctx.restore();
+      } else {                                                                                                                           // tubos de ensaio
+        ctx.fillStyle = '#2c3a48'; ctx.fillRect(x - 36, y0 - 70, 72, 6);
+        for (let q = 0; q < 4; q++) { ctx.fillStyle = 'rgba(220,240,250,.5)'; ctx.fillRect(x - 30 + q * 17, y0 - 100, 10, 32); ctx.fillStyle = cores[q]; ctx.fillRect(x - 29 + q * 17, y0 - 90, 8, 22); }
+      }
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // Biblioteca: estantes de livros do piso ao teto, luminária de leitura, escada e globo.
+  function wallLibrary(ctx, t, doorXs) {
+    const w = ISO.NX * ISO.U, y0 = ISO.OY;
+    const g = ctx.createLinearGradient(0, 0, 0, y0); g.addColorStop(0, '#24170e'); g.addColorStop(1, '#3a2716');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, y0);
+    const cores = ['#8c2f39', '#2f5d8c', '#c19a3a', '#2e7d5b', '#6a4c93', '#b5651d', '#3b7a8c', '#a34a6b'];
+    for (let row = 0; row < 6; row++) {
+      const base = 100 + row * 52;
+      for (let x = 4; x < w - 4;) {
+        const bw = 7 + Math.floor(hash(row, x) * 8), bh = 30 + Math.floor(hash(x, row + 3) * 16);
+        ctx.fillStyle = shade(cores[Math.floor(hash(row + 2, x + 1) * cores.length)], 0.7 + hash(x, row) * 0.35);
+        ctx.fillRect(x, base - bh, bw, bh);
+        ctx.fillStyle = 'rgba(255,230,170,.35)'; ctx.fillRect(x + 1, base - bh + 5, bw - 2, 2);
+        x += bw + 1;
+      }
+      ctx.fillStyle = '#5a3d24'; ctx.fillRect(0, base, w, 7); ctx.fillStyle = 'rgba(255,220,170,.18)'; ctx.fillRect(0, base, w, 2);
+    }
+    ctx.fillStyle = '#4a3220'; for (let x = 0; x <= w; x += 188) ctx.fillRect(x - 3, 70, 6, y0 - 70);
+    const lamp = ctx.createRadialGradient(w * 0.82, 120, 6, w * 0.82, 120, 150); lamp.addColorStop(0, 'rgba(255,214,130,.35)'); lamp.addColorStop(1, 'rgba(255,214,130,0)');
+    ctx.fillStyle = lamp; ctx.fillRect(0, 0, w, y0);
+    ctx.fillStyle = '#2a1a0e'; ctx.fillRect(0, y0 - 34, w, 34); ctx.fillStyle = '#6a4a2a'; ctx.fillRect(0, y0 - 36, w, 4);
+    for (let k = 0, x = 70; x < w - 40; x += 150, k++) {
+      if (!livre(x, 52, doorXs)) continue;
+      ctx.fillStyle = '#6a4526'; ctx.fillRect(x - 50, y0 - 52, 100, 9); ctx.fillRect(x - 44, y0 - 44, 7, 40); ctx.fillRect(x + 37, y0 - 44, 7, 40);
+      if (k % 2 === 0) {                                                                                                                 // luminária verde
+        ctx.fillStyle = '#c9a050'; ctx.fillRect(x - 3, y0 - 84, 6, 32); ctx.fillStyle = '#2e8a5e'; ctx.beginPath(); ctx.ellipse(x, y0 - 88, 20, 11, 0, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = 'rgba(255,224,150,.28)'; ctx.beginPath(); ctx.moveTo(x - 20, y0 - 86); ctx.lineTo(x + 20, y0 - 86); ctx.lineTo(x + 38, y0 - 52); ctx.lineTo(x - 38, y0 - 52); ctx.fill();
+      } else {                                                                                                                           // livros empilhados
+        [['#8c2f39', 70], ['#2f5d8c', 62], ['#c19a3a', 56]].forEach(([c, wd], q) => { ctx.fillStyle = c; ctx.fillRect(x - wd / 2, y0 - 52 - (q + 1) * 12, wd, 11); ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(x - wd / 2 + 4, y0 - 52 - (q + 1) * 12 + 4, wd - 8, 2); });
+      }
+    }
+  }
+
+  // Sala completa de um ambiente (env = 'datacenter' | 'escritorio' | 'sala' | 'laboratorio' | 'biblioteca'). doorXs = posições das portas.
+  function drawRoom(ctx, t, doorXs, env) {
+    const e = env || 'datacenter';
+    ({ datacenter: drawWall, escritorio: wallOffice, sala: wallClass, laboratorio: wallLab, biblioteca: wallLibrary }[e] || drawWall)(ctx, t, doorXs);
+    if (e === 'datacenter' || !ENV_INFO[e]) drawFloor(ctx, t); else drawFloorEnv(ctx, t, e);
     const v = ctx.createLinearGradient(0, 0, ISO.SW, 0);                         // vinheta lateral discreta
     v.addColorStop(0, 'rgba(2,6,12,.45)'); v.addColorStop(0.08, 'rgba(2,6,12,0)'); v.addColorStop(0.92, 'rgba(2,6,12,0)'); v.addColorStop(1, 'rgba(2,6,12,.35)');
     ctx.fillStyle = v; ctx.fillRect(0, 0, ISO.SW, ISO.OY + ISO.NY * ISO.V + 18);
+  }
+
+  // ---------- Prédio da fase (animação de entrada) ----------
+  // Fachada frontal de um prédio por ambiente, com porta de correr central. (cx, baseY) = centro e base do prédio; open 0..1 = porta.
+  // Devolve a geometria útil: { top, doorW, doorH }.
+  function drawBuilding(ctx, env, cx, baseY, open, t) {
+    const W = 520, H = 290, x = cx - W / 2, y = baseY - H, DW = 132, DH = 178, ac = (ENV_INFO[env] || ENV_INFO.datacenter).accent;
+    const tt = reduced ? 0 : t;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.42)'; ctx.beginPath(); ctx.ellipse(cx, baseY + 6, W * 0.62, 16, 0, 0, Math.PI * 2); ctx.fill();
+    const vidro = (wx, wy, ww, wh, lit) => { ctx.fillStyle = lit ? 'rgba(255,226,150,.9)' : 'rgba(30,60,96,.9)'; ctx.fillRect(wx, wy, ww, wh); ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(wx, wy, ww, 3); };
+    if (env === 'escritorio') {                                                         // torre de vidro
+      const g = ctx.createLinearGradient(x, y, x + W, baseY); g.addColorStop(0, '#4a8cc4'); g.addColorStop(1, '#1a4570');
+      ctx.fillStyle = g; ctx.fillRect(x, y, W, H);
+      for (let r = 0; r < 6; r++) for (let c = 0; c < 10; c++) { if (y + 24 + r * 38 > baseY - DH - 6 && Math.abs(x + 26 + c * 48 - cx) < DW) continue; vidro(x + 10 + c * 50, y + 20 + r * 38, 36, 26, hash(r, c) < 0.4); }
+      poly(ctx, [[x, y], [x + 170, y], [x + 60, baseY], [x, baseY]], 'rgba(255,255,255,.07)');
+      ctx.fillStyle = '#31465f'; ctx.fillRect(cx - 4, y - 46, 8, 46);
+      ctx.fillStyle = Math.floor(tt * 2) % 2 ? '#ff4d5e' : '#7a2430'; ctx.beginPath(); ctx.arc(cx, y - 50, 5, 0, Math.PI * 2); ctx.fill();
+    } else if (env === 'sala') {                                                        // escola de tijolos
+      ctx.fillStyle = '#92503f'; ctx.fillRect(x, y, W, H);
+      ctx.fillStyle = 'rgba(0,0,0,.16)'; for (let r = 0; r < H / 14; r++) { ctx.fillRect(x, y + r * 14, W, 1.5); for (let c = (r % 2) * 20; c < W; c += 40) ctx.fillRect(x + c, y + r * 14, 1.5, 14); }
+      poly(ctx, [[x - 24, y], [x + W + 24, y], [cx, y - 78]], '#6b3a2e'); poly(ctx, [[x - 24, y], [x + W + 24, y], [x + W + 24, y + 12], [x - 24, y + 12]], '#4a2a22');
+      circ(ctx, cx, y - 30, 20, '#f1ead8'); ctx.strokeStyle = '#4a3220'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, y - 30, 20, 0, Math.PI * 2); ctx.moveTo(cx, y - 30); ctx.lineTo(cx, y - 44); ctx.moveTo(cx, y - 30); ctx.lineTo(cx + 10, y - 26); ctx.stroke();
+      for (let c = 0; c < 6; c++) { if (Math.abs(x + 50 + c * 84 - cx) < DW) continue; ctx.fillStyle = '#eee6d2'; ctx.fillRect(x + 22 + c * 84, y + 110, 56, 70); vidro(x + 27 + c * 84, y + 115, 46, 60, hash(c, 4) < 0.5); ctx.fillStyle = '#eee6d2'; ctx.fillRect(x + 49 + c * 84, y + 115, 3, 60); }
+      ctx.fillStyle = '#c9c2b0'; ctx.fillRect(x + W - 40, y - 96, 4, 96);
+      const wv = Math.sin(tt * 4) * 4; poly(ctx, [[x + W - 36, y - 94], [x + W + 8, y - 88 + wv], [x + W + 6, y - 66 + wv], [x + W - 36, y - 70]], '#f2b84b');
+    } else if (env === 'laboratorio') {                                                 // laboratório moderno
+      const g = ctx.createLinearGradient(x, y, x, baseY); g.addColorStop(0, '#eef5fa'); g.addColorStop(1, '#a9bccb');
+      ctx.fillStyle = g; ctx.fillRect(x, y, W, H);
+      ctx.fillStyle = '#2fb896'; ctx.fillRect(x, y + 104, W, 14);
+      for (let c = 0; c < 8; c++) { if (Math.abs(x + 40 + c * 62 - cx) < DW * 0.75) continue; ctx.fillStyle = '#d4e0ea'; ctx.fillRect(x + 14 + c * 62, y + 130, 50, 44); ctx.fillStyle = 'rgba(47,184,150,.65)'; ctx.fillRect(x + 18 + c * 62, y + 134, 42, 36); }
+      circ(ctx, x + 70, y + 60, 30, '#d4e0ea'); circ(ctx, x + 70, y + 60, 24, 'rgba(47,184,150,.7)'); circ(ctx, x + W - 70, y + 60, 30, '#d4e0ea'); circ(ctx, x + W - 70, y + 60, 24, 'rgba(47,184,150,.7)');
+      [-1, 1].forEach(k => { ctx.fillStyle = '#9fb1bf'; ctx.fillRect(cx + k * 190 - 12, y - 36, 24, 36); ctx.fillStyle = `rgba(91,227,176,${0.25 + 0.2 * Math.sin(tt * 3 + k)})`; ctx.beginPath(); ctx.ellipse(cx + k * 190, y - 48, 16, 20, 0, 0, Math.PI * 2); ctx.fill(); });
+    } else if (env === 'biblioteca') {                                                  // biblioteca clássica
+      const g = ctx.createLinearGradient(x, y, x, baseY); g.addColorStop(0, '#e2d2ae'); g.addColorStop(1, '#a99468');
+      ctx.fillStyle = g; ctx.fillRect(x, y, W, H);
+      poly(ctx, [[x - 20, y], [x + W + 20, y], [cx, y - 76]], '#d2bf95'); poly(ctx, [[x - 20, y], [x + W + 20, y], [x + W + 20, y + 14], [x - 20, y + 14]], '#b9a578');
+      circ(ctx, cx, y - 30, 17, '#8a7650'); ctx.fillStyle = '#e2d2ae'; ctx.fillRect(cx - 12, y - 36, 11, 14); ctx.fillRect(cx + 1, y - 36, 11, 14);
+      [x + 40, x + 120, x + W - 152, x + W - 72].forEach(cxl => { ctx.fillStyle = '#f2e6c8'; ctx.fillRect(cxl, y + 18, 32, H - 38); ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(cxl + 22, y + 18, 10, H - 38); ctx.fillStyle = '#cdb98f'; ctx.fillRect(cxl - 5, y + 14, 42, 10); ctx.fillRect(cxl - 5, baseY - 24, 42, 10); });
+      [x + 78, x + W - 110].forEach(wx => { ctx.fillStyle = 'rgba(255,200,110,.85)'; ctx.fillRect(wx - 6, y + 120, 36, 56); ctx.beginPath(); ctx.arc(wx + 12, y + 120, 18, Math.PI, 0); ctx.fill(); });
+      ctx.fillStyle = '#b9a578'; ctx.fillRect(x - 14, baseY - 14, W + 28, 8); ctx.fillStyle = '#a58f66'; ctx.fillRect(x - 28, baseY - 6, W + 56, 8);
+    } else {                                                                            // centro de dados (bloco escuro com LEDs)
+      const g = ctx.createLinearGradient(x, y, x, baseY); g.addColorStop(0, '#16294a'); g.addColorStop(1, '#0b182c');
+      ctx.fillStyle = g; ctx.fillRect(x, y, W, H);
+      ctx.strokeStyle = 'rgba(88,166,255,.5)'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, W - 2, H - 2);
+      for (let c = 0; c < 12; c++) for (let r = 0; r < 9; r++) { if (Math.abs(x + 22 + c * 40 - cx) < DW * 0.6 && y + 40 + r * 24 > baseY - DH - 20) continue; ctx.fillStyle = (Math.floor(tt * 2 + c + r * 2) % 3) ? 'rgba(88,166,255,.8)' : '#12315a'; ctx.fillRect(x + 14 + c * 40, y + 38 + r * 24, 24, 5); }
+      [-1, 1].forEach(k => { ctx.strokeStyle = '#8fa9c8'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx + k * 205, y); ctx.lineTo(cx + k * 205, y - 24); ctx.stroke(); ctx.fillStyle = '#c9d6e6'; ctx.beginPath(); ctx.ellipse(cx + k * 205, y - 30, 26, 11, k * 0.4, 0, Math.PI * 2); ctx.fill(); });
+    }
+    // porta de correr central, com luz por dentro
+    const dx = cx - DW / 2, dy = baseY - DH;
+    ctx.fillStyle = '#0c1522'; ctx.fillRect(dx - 8, dy - 8, DW + 16, DH + 8);
+    const luz = ctx.createLinearGradient(0, dy, 0, baseY); luz.addColorStop(0, '#fff3cf'); luz.addColorStop(1, '#ffc766');
+    ctx.fillStyle = luz; ctx.globalAlpha = 0.25 + 0.75 * open; ctx.fillRect(dx, dy, DW, DH); ctx.globalAlpha = 1;
+    ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, DW, DH); ctx.clip();
+    const off = open * (DW / 2 + 2);
+    [dx - off, cx + off].forEach(px => {
+      const pg = ctx.createLinearGradient(px, dy, px + DW / 2, baseY); pg.addColorStop(0, '#2a6fd0'); pg.addColorStop(1, '#123a72');
+      ctx.fillStyle = pg; ctx.fillRect(px, dy, DW / 2, DH); ctx.strokeStyle = 'rgba(140,190,250,.85)'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, dy + 1, DW / 2 - 2, DH - 2);
+      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(px + 8, dy + 10, 6, DH - 20);
+    });
+    ctx.restore();
+    ctx.strokeStyle = ac; ctx.lineWidth = 4; ctx.shadowColor = ac; ctx.shadowBlur = 14; ctx.strokeRect(dx - 8, dy - 8, DW + 16, DH + 8);
+    ctx.restore();
+    return { top: y, doorW: DW, doorH: DH };
+  }
+
+  // Placa grande do prédio: "kicker" (ex.: FASE 2 DE 4) e o nome do grupo, que encolhe/quebra em até 2 linhas para caber.
+  function drawSign(ctx, cx, top, w, h, kicker, title, accent, t) {
+    const x = cx - w / 2;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 12;
+    const g = ctx.createLinearGradient(0, top, 0, top + h); g.addColorStop(0, '#13264a'); g.addColorStop(1, '#09152b');
+    rr(ctx, x, top, w, h, 16); ctx.fillStyle = g; ctx.fill();
+    ctx.restore();
+    ctx.save(); ctx.shadowColor = accent; ctx.shadowBlur = 16 + (reduced ? 0 : 6 * Math.sin(t * 3));
+    rr(ctx, x, top, w, h, 16); ctx.strokeStyle = accent; ctx.lineWidth = 4; ctx.stroke(); ctx.restore();
+    rr(ctx, x + 9, top + 9, w - 18, h - 18, 10); ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 1.5; ctx.stroke();
+    [x + 24, x + w - 24].forEach(bx => { circ(ctx, bx, top + 22, 5, accent); circ(ctx, bx, top + h - 22, 5, accent); });
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `bold 21px ${MONO}`; ctx.fillStyle = accent; ctx.fillText(kicker, cx, top + 31);
+    let size = 54, lines = [];
+    for (; size >= 26; size -= 2) { ctx.font = `bold ${size}px ${SANS}`; lines = wrap(ctx, title, w - 90); if (lines.length <= 2 && lines.length * Math.round(size * 1.12) <= h - 70 && lines.every(l => ctx.measureText(l).width <= w - 90)) break; }
+    const lh = Math.round(size * 1.12), area = h - 58, y0 = top + 52 + (area - lines.length * lh) / 2 + lh / 2;
+    ctx.save(); ctx.shadowColor = accent; ctx.shadowBlur = 10; ctx.fillStyle = '#ffffff';
+    lines.slice(0, 2).forEach((l, i) => ctx.fillText(l, cx, y0 + i * lh)); ctx.restore();
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // Céu, cidade ao fundo e a praça (com o tapete que leva à porta) onde o avatar caminha até o prédio.
+  function drawStreet(ctx, env, t, baseY) {
+    const W = 1280, H = 720, cx = 640;
+    const cores = { datacenter: ['#050c1a', '#0f2748'], escritorio: ['#07142c', '#1d4a7a'], sala: ['#1c1530', '#7a4a52'], laboratorio: ['#06181d', '#12525a'], biblioteca: ['#180f09', '#5a3a22'] }[env] || ['#050c1a', '#0f2748'];
+    const sky = ctx.createLinearGradient(0, 0, 0, baseY); sky.addColorStop(0, cores[0]); sky.addColorStop(1, cores[1]);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, baseY);
+    for (let i = 0; i < 70; i++) { const sx = hash(i, 1) * W, sy = hash(i, 2) * (baseY - 140), a = 0.3 + 0.5 * hash(i, 3) * (reduced ? 1 : (0.6 + 0.4 * Math.sin(t * 2 + i))); ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(sx, sy, 2, 2); }
+    for (let layer = 0; layer < 2; layer++) {                                          // cidade distante, em duas camadas
+      for (let x = -20, k = 0; x < W + 40; k++) {
+        const bw = 50 + hash(k, layer + 5) * 70, bh = (layer ? 90 : 150) + hash(k, layer + 9) * (layer ? 90 : 130);
+        ctx.fillStyle = layer ? 'rgba(10,22,42,.85)' : 'rgba(6,14,28,.95)'; ctx.fillRect(x, baseY - bh, bw, bh);
+        if (!layer) for (let r = 0; r < bh / 22; r++) for (let c = 0; c < bw / 18; c++) if (hash(k * 9 + r, c) < 0.22) { ctx.fillStyle = 'rgba(255,214,130,.6)'; ctx.fillRect(x + 6 + c * 18, baseY - bh + 8 + r * 22, 6, 8); }
+        x += bw + 6 + hash(k, 3) * 10;
+      }
+    }
+    const gr = ctx.createLinearGradient(0, baseY, 0, H); gr.addColorStop(0, '#12233b'); gr.addColorStop(1, '#0a1424');
+    ctx.fillStyle = gr; ctx.fillRect(0, baseY, W, H - baseY);
+    ctx.strokeStyle = 'rgba(88,166,255,.18)'; ctx.lineWidth = 1;                         // piso da praça em perspectiva
+    for (let k = -10; k <= 10; k++) { ctx.beginPath(); ctx.moveTo(cx + k * 30, baseY); ctx.lineTo(cx + k * 130, H); ctx.stroke(); }
+    for (let k = 1; k < 7; k++) { const yy = baseY + (H - baseY) * Math.pow(k / 7, 1.7); ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke(); }
+    poly(ctx, [[cx - 78, baseY], [cx + 78, baseY], [cx + 230, H], [cx - 230, H]], 'rgba(88,166,255,.13)');   // tapete até a porta
+    ctx.strokeStyle = 'rgba(120,180,250,.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx - 78, baseY); ctx.lineTo(cx - 230, H); ctx.moveTo(cx + 78, baseY); ctx.lineTo(cx + 230, H); ctx.stroke();
+    ctx.fillStyle = 'rgba(120,180,250,.5)'; ctx.fillRect(0, baseY, W, 2);
   }
 
   // Faixa de dados (passarela) em perspectiva, da porta até o horizonte, visível pela eclusa aberta.
@@ -615,7 +926,7 @@
     toScreen(gridX, gridY, gridZ) { return project(gridX, gridY, gridZ); }
     setReducedMotion(v) { reduced = !!v; }
     drawVoxel(ctx, gridX, gridY, gridZ, colors) { return drawVoxel(ctx, gridX, gridY, gridZ, colors); }
-    drawRoom(ctx, t, doorXs) { return drawRoom(ctx, t, doorXs); }
+    drawRoom(ctx, t, doorXs, env) { return drawRoom(ctx, t, doorXs, env); }
     drawDoors(ctx, count, doorsData) { return drawDoors(ctx, count, doorsData || []); }
     drawFade(ctx, alpha) { return drawFade(ctx, alpha); }
     loadLogos(config, callback) { return loadLogos(config, callback); }
@@ -624,7 +935,8 @@
   Object.assign(IsoRenderer.prototype, {
     project, shade, hash, poly, rr, cube, isoBox, isoFaceLabel, wrap, pixelText, glowText,
     drawBackground, drawPanel, drawButton, wipe, drawLogo,
-    drawFloor, drawWall, drawWalkway, layoutDoors, drawDoorBack, drawDoorFront, drawHolo, drawHintBox
+    drawFloor, drawWall, drawWalkway, layoutDoors, drawDoorBack, drawDoorFront, drawHolo, drawHintBox,
+    ENVIRONMENTS, ENV_INFO, envOf, drawBuilding, drawSign, drawStreet
   });
 
   window.IsoRendererClass = IsoRenderer;

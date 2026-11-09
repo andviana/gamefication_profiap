@@ -456,7 +456,7 @@
     if (!canStart()) { say(missingText()); return; }
     const nm = nameInput.value, av = AVS.sel;
     nameInput.blur();
-    Trans.start(() => { GS.startQuiz(nm, av); onEnter(S.QUIZ_PLAYING); });
+    Trans.start(() => { GS.startQuiz(nm, av); onEnter(GS.current); });      // primeiro o prédio do primeiro grupo, depois as perguntas
   }
   // Tab percorre: campo do nome (as teclas digitam) -> grade de avatares (1 a 9 e setas escolhem) -> botões da tela.
   // Shift+Tab percorre ao contrário.
@@ -541,6 +541,65 @@
   }
 
   // =====================================================================
+  //  PHASE_INTRO - o avatar entra no prédio do grupo (cada grupo de perguntas é uma fase, em um ambiente diferente)
+  // =====================================================================
+  // Na primeira fase (início do jogo) só aparece o prédio com a placa do grupo; nas seguintes, com confetes e "Você passou de fase!".
+  const PI = { t: 0, first: true, env: 'datacenter', numero: 1, total: 1, nome: '', parts: [], walk: 0, stepIdx: 0, fanfare: false, door: false };
+  const PI_BASE = 560, PI_WALK0 = 0.6, PI_WALK1 = 3.0, PI_IN1 = 3.8;
+  const piEnd = () => (PI.first ? 4.3 : 5.0);
+
+  function initPhaseIntro() {
+    const f = GS.currentPhase;
+    PI.t = 0; PI.first = GS.phaseIntroFirst; PI.env = R.envOf(GS.currentPhaseIndex); PI.numero = GS.currentPhaseIndex + 1; PI.total = GS.totalPhases;
+    PI.nome = f ? f.group : ''; PI.walk = 0; PI.stepIdx = 0; PI.fanfare = false; PI.door = false;
+    PI.parts = (!PI.first && !reduced) ? Array.from({ length: 110 }, (_, i) => ({
+      x: Math.random() * W, y: -Math.random() * H * 0.7, vx: (Math.random() - 0.5) * 70, vy: 110 + Math.random() * 190,
+      s: 5 + Math.random() * 9, r: Math.random() * 6, vr: (Math.random() - 0.5) * 10, c: ['#58a6ff', '#f2c230', '#ff5d8f', '#72acf8', '#7cf0a8'][i % 5]
+    })) : [];
+    say(PI.first ? `Fase ${PI.numero} de ${PI.total}: ${PI.nome}. Seu avatar entra no prédio.` : `Você passou de fase! Fase ${PI.numero} de ${PI.total}: ${PI.nome}.`);
+  }
+
+  function updatePhaseIntro(dt) {
+    PI.t += dt;
+    if (!PI.first && !PI.fanfare && PI.t >= 0.15) { PI.fanfare = true; SoundSystem.playSuccessFanfare(); }
+    if (!PI.door && PI.t >= 2.5) { PI.door = true; SoundSystem.playDoorOpen(); }
+    if (PI.t >= PI_WALK0 && PI.t < PI_IN1) {                                  // passos no ritmo da caminhada
+      PI.walk += dt * 11;
+      const k = Math.floor(PI.walk / Math.PI);
+      if (k !== PI.stepIdx) { PI.stepIdx = k; SoundSystem.playStep(); }
+    }
+    PI.parts.forEach(c => { c.x += c.vx * dt; c.y += c.vy * dt; c.r += c.vr * dt; if (c.y > H + 10) { c.y = -10; c.x = Math.random() * W; } });
+    if (PI.t >= piEnd() && !Trans.active) finishPhaseIntro();
+  }
+
+  function finishPhaseIntro() {
+    if (Trans.active || GS.current !== S.PHASE_INTRO) return;
+    Trans.start(() => { GS.beginPhase(); onEnter(S.QUIZ_PLAYING); });
+  }
+
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  function drawPhaseIntro() {
+    const cx = W / 2, accent = R.ENV_INFO[PI.env].accent, t = PI.t;
+    const aberta = t < 3.9 ? clamp((t - 2.5) / 0.5, 0, 1) : Math.max(0, 1 - (t - 3.9) / 0.45);
+    R.drawStreet(ctx, PI.env, VT, PI_BASE);
+    const b = R.drawBuilding(ctx, PI.env, cx, PI_BASE, aberta, VT);
+    // avatar: anda até a porta (cada vez menor, como se fosse para o fundo) e atravessa a porta
+    const k = easeOut(clamp((t - PI_WALK0) / (PI_WALK1 - PI_WALK0), 0, 1)), q = clamp((t - PI_WALK1) / (PI_IN1 - PI_WALK1), 0, 1);
+    const ay = 700 - (700 - (PI_BASE + 8)) * k - 26 * q, asc = 1.5 - 0.5 * k - 0.12 * q, aal = t < PI_WALK0 ? clamp(t / 0.3, 0, 1) : 1 - q;
+    R.drawSign(ctx, cx, b.top - 56, 460, 150, `FASE ${PI.numero} DE ${PI.total}`, PI.nome, accent, VT);
+    if (aal > 0.01) AV.drawAvatar(ctx, cx, ay, GS.selectedAvatar, (t >= PI_WALK0 && t < PI_IN1) ? 'walking' : 'idle', PI.walk, { scale: asc, t: VT, face: 'L', alpha: aal });
+    PI.parts.forEach(c => { ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.r); ctx.globalAlpha = 0.9; ctx.fillStyle = c.c; ctx.fillRect(-c.s / 2, -c.s / 2, c.s, c.s * 0.6); ctx.restore(); });
+    if (!PI.first) {                                                         // só nas trocas de fase (não no início do jogo)
+      const pop = easeOut(clamp((t - 0.2) / 0.45, 0, 1)), sc = 0.55 + 0.45 * pop;
+      ctx.save(); ctx.globalAlpha = pop; ctx.translate(cx, 66); ctx.scale(sc, sc);
+      ctx.shadowColor = '#f2c230'; ctx.shadowBlur = 24;
+      R.pixelText(ctx, 'Você passou de fase!', 0, -26, 54, '#ffd54a', 'center');
+      ctx.restore();
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // =====================================================================
   //  QUIZ_PLAYING - perguntas no cenário isométrico
   // =====================================================================
   const QF_H = 60;                                          // altura do rodapé (pergunta N de T e dicas de controle)
@@ -599,6 +658,7 @@
   function initQuestion() {
     const q = GS.currentQuestion;
     Q.q = q; Q.phase = 'play'; Q.chosen = null; Q.timer = 0; Q.near = null; Q.nearHint = false; Q.hintGlow = 0;
+    Q.env = R.envOf(GS.currentPhaseIndex);                  // cada fase (grupo) tem o seu ambiente
     Q.startedAt = performance.now(); Q.tempoMs = 0;          // o tempo de resposta vai ao servidor junto com a escolha
     if (GS.currentQuestionIndex === 0) { XP.shown = 0; XP.target = 0; XP.pulse = 0; }     // nova partida: contador zerado
     GS.activeModalHint = false;
@@ -786,7 +846,7 @@
     const fy = Q.footerTop;
     ctx.fillStyle = 'rgba(13,17,23,.96)'; ctx.fillRect(0, fy, W, QF_H);
     ctx.fillStyle = CYAN; ctx.fillRect(0, fy, W, 2);
-    const info = `Pergunta ${GS.currentQuestionIndex + 1} de ${GS.totalQuestions}`;
+    const info = (GS.totalPhases > 1 ? `Fase ${GS.currentPhaseIndex + 1} de ${GS.totalPhases} · ` : '') + `Pergunta ${GS.currentQuestionIndex + 1} de ${GS.totalQuestions}`;
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = font(14); ctx.fillStyle = C.mute;
     ctx.fillText(info, 30, fy + QF_H / 2 + 2);
     const x0 = 30 + ctx.measureText(info).width + 28, avail = W - 130 - x0;
@@ -879,7 +939,7 @@
   function drawQuiz() {
     const q = Q.q, a = Q.a, hm = measureQHeader(q), modal = GS.activeModalHint;
     R.drawBackground(ctx, VT);
-    R.drawRoom(ctx, VT, Q.doors.map(dr => dr.bx));
+    R.drawRoom(ctx, VT, Q.doors.map(dr => dr.bx), Q.env);
     const zoneDoor = (Q.phase === 'play' && !modal) ? nearDoor() : null;
     const zoneHint = (Q.phase === 'play' && !modal && !zoneDoor && nearHint());
     const sp = R.project(a.gridX, a.gridY, 0), sc = 0.95 + 0.25 * (a.gridY / NY);      // mais perto do jogador, um pouco maior
@@ -1222,6 +1282,7 @@
       nameInput.focus();
       say('Crie seu avatar. Digite seu nome, com letras e números, até 15 caracteres. Pressione Tab para ir aos avatares e escolha com as teclas de 1 a 9 ou as setas. Enter confirma.');
     }
+    if (state === S.PHASE_INTRO) initPhaseIntro();
     if (state === S.QUIZ_PLAYING) initQuestion();
     if (state === S.ANSWER_FEEDBACK) initFeedback();
     if (state === S.PODIUM_REVIEW) { PD.items = []; startSave(false); }      // grava a partida ANTES de mostrar o relatório
@@ -1251,6 +1312,7 @@
         if (b.enabled && inRect(mouse, b.x, b.y, b.w, b.h)) { SoundSystem.playHintClick(); b.fn(); return true; }
       }
       if (GS.current === S.ANSWER_FEEDBACK) { skipFeedback(); return true; }          // clique: pula a reação
+      if (GS.current === S.PHASE_INTRO) { finishPhaseIntro(); return true; }          // clique: pula a animação do prédio
       if (scr && inRect(mouse, scr.x, scr.y, scr.w, scr.h)) drag = { y: mouse.y, v: scr.v };
       return false;
     },
@@ -1296,6 +1358,8 @@
         else if (k === 'ArrowRight') { selectAvatar(AVS.sel === null ? 0 : (AVS.sel + 1) % n); SoundSystem.playHintClick(); }
         else if (k === 'ArrowLeft') { selectAvatar(AVS.sel === null ? n - 1 : (AVS.sel + n - 1) % n); SoundSystem.playHintClick(); }
         else if (k === 'Enter') startGame();
+      } else if (st === S.PHASE_INTRO) {
+        if (confirm || k === 'Escape') finishPhaseIntro();                 // pula a animação do prédio
       } else if (st === S.ANSWER_FEEDBACK) {
         if (confirm || k === 'Escape') skipFeedback();
       } else if (st === S.QUIZ_PLAYING) {
@@ -1335,6 +1399,7 @@
       if (AVS.autoFocus && GS.current === S.AVATAR_SELECT && !Trans.active && !HELP.open) {      // garante o foco inicial no campo do nome
         if (document.activeElement === nameInput) AVS.autoFocus = false; else nameInput.focus();
       }
+      if (GS.current === S.PHASE_INTRO) updatePhaseIntro(dt);
       if (GS.current === S.QUIZ_PLAYING && !Trans.active) updateQuestion(dt);
       if (GS.current === S.ANSWER_FEEDBACK) updateFeedback(dt);
     },
@@ -1346,11 +1411,12 @@
         case S.TITLE: drawTitle(); break;
         case S.INSTRUCTIONS: drawInstructions(); break;
         case S.AVATAR_SELECT: drawAvatarSelect(); break;
+        case S.PHASE_INTRO: drawPhaseIntro(); break;
         case S.QUIZ_PLAYING: drawQuiz(); break;
         case S.ANSWER_FEEDBACK: drawFeedback(dt); break;
         case S.PODIUM_REVIEW: drawPodium(dt); break;
       }
-      if (GS.current === S.TITLE || GS.current === S.INSTRUCTIONS || GS.current === S.AVATAR_SELECT) drawA11yButtons();
+      if (GS.current === S.TITLE || GS.current === S.INSTRUCTIONS || GS.current === S.AVATAR_SELECT || GS.current === S.PHASE_INTRO) drawA11yButtons();
       if (HELP.open && GS.current === S.AVATAR_SELECT) drawHelpModal();
       drawFocusRing();
       if (Trans.active) { if (reduced) R.drawFade(ctx, Trans.p()); else R.wipe(ctx, Trans.p()); }   // sem movimento: fade simples

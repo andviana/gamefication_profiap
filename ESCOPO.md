@@ -108,11 +108,14 @@ As logos são pré-carregadas (limite de 3 s). Se alguma falhar (arquivo ausente
 ## 5. Máquina de estados (`state.js`)
 
 ```
-BOOT → TITLE ⇄ INSTRUCTIONS ⇄ AVATAR_SELECT → QUIZ_PLAYING → ANSWER_FEEDBACK ─┬→ QUIZ_PLAYING (próxima pergunta)
-                                                                              └→ PODIUM_REVIEW → TITLE
+BOOT → TITLE ⇄ INSTRUCTIONS ⇄ AVATAR_SELECT → PHASE_INTRO → QUIZ_PLAYING → ANSWER_FEEDBACK ─┬→ QUIZ_PLAYING (próxima pergunta, mesma fase)
+                                                                                          ├→ PHASE_INTRO (novo grupo: prédio da próxima fase)
+                                                                                          └→ PODIUM_REVIEW → TITLE
 ```
 
-Transições inválidas lançam erro. A cada pergunta, o jogo percorre `QUIZ_PLAYING → ANSWER_FEEDBACK → QUIZ_PLAYING`; depois da última, vai ao pódio.
+Transições inválidas lançam erro. A cada pergunta, o jogo percorre `QUIZ_PLAYING → ANSWER_FEEDBACK → QUIZ_PLAYING`; quando a próxima pergunta é de outro grupo, passa antes por `PHASE_INTRO`; depois da última, vai ao pódio.
+
+**Fases:** cada grupo de perguntas é uma **fase**. Em `loadQuiz` as perguntas são agrupadas (os grupos seguem a ordem da primeira pergunta de cada um e, dentro do grupo, a numeração), de modo que `Tecnologia` com as perguntas 3, 4 e 8 vira uma única fase com 3, 4 e 8. O número da pergunta gravado é o de sempre; só a ordem de jogo muda (`ordem` = ordem em que foi respondida). `GameState.phases` = `[{ group, start, count }]`.
 
 - **BOOT** (`GameState.boot()`): valida só `GAME_CONFIG` e a presença de `TQApi`. Se falhar, o estado permanece em `BOOT` e aparece a tela vermelha de bloqueio. As perguntas são validadas depois, ao montar o questionário recebido do servidor (2 a 4 alternativas e exatamente 1 correta por pergunta); a tela de abertura pede o código da turma (5 letras).
 - **Dados em memória:** `playerName`, `selectedAvatar` (0–8), `currentQuestionIndex`, `score`, `activeModalHint` e `answersHistory`; o acessor `lastAnswer` devolve a resposta mais recente (usada pela tela de reação).
@@ -120,6 +123,10 @@ Transições inválidas lançam erro. A cada pergunta, o jogo percorre `QUIZ_PLA
 - **Jogar Novamente** (`restart()`): zera nome, avatar, pontuação, histórico e a dica, e volta a `TITLE`. O tamanho do texto e o estado do som, que são preferências, permanecem.
 
 ## 6. Telas e jogabilidade (`screens.js`)
+
+**Ambientes por fase:** 5 ambientes em rodízio, na ordem centro de dados → escritório → sala de aula → laboratório → biblioteca (a fase 6 volta ao centro de dados; duas fases seguidas nunca repetem). Cada um tem parede, piso e móveis próprios (janelões com a cidade, lousa, bancadas com vidrarias, estantes de livros...); portas, avatar e caixa de dica são os mesmos.
+
+**`PHASE_INTRO` (animação do prédio):** fachada frontal de um prédio do estilo do ambiente (torre de vidro, escola de tijolos, laboratório moderno, biblioteca clássica ou bloco de dados) com uma **placa grande** ("FASE N DE T" e o nome do grupo). O avatar anda até a porta (ficando menor), ela abre e ele entra. Na primeira fase (início do jogo, depois do avatar) é só isso; nas trocas de fase há também **confetes**, a fanfarra e a frase **"Você passou de fase!"**. Dura cerca de 4 a 5 s; Enter, Espaço, Esc ou clique pulam. Depois da última pergunta do último grupo não há animação: vai direto ao pódio.
 
 Entre telas e entre perguntas há um **wipe digital** (blocos que "ligam" da esquerda para a direita, 0,38 s para cobrir e 0,38 s para revelar). Com movimento reduzido, vira um fade simples.
 

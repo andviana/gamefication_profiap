@@ -139,3 +139,24 @@ def test_tela_de_perguntas_com_barra_lateral_caixa_de_dica_e_sala_frontal():
     # caixa de dica no cenário, na frente (oposta às portas), com interação por Enter, clique e tecla H
     assert "drawHintBox" in renderer and "Q.hint = hasHint ? { gx: 2.3, gy: NY - 0.95 } : null" in js
     assert "else if (nearHint()) openHint()" in js and "walkToHint" in js and "(k === 'h' || k === 'H') && Q.hint" in js
+
+
+def test_fases_por_grupo_ambientes_e_animacao_do_predio():
+    estado = (RAIZ / "app/static/game/js/state.js").read_text(encoding="utf-8")
+    js = (RAIZ / "app/static/game/js/screens.js").read_text(encoding="utf-8")
+    renderer = (RAIZ / "app/static/game/js/renderer.js").read_text(encoding="utf-8")
+    # estado: nova tela entre o avatar e as perguntas, e a cada troca de grupo
+    assert "PHASE_INTRO: 'PHASE_INTRO'" in estado and "AVATAR_SELECT: ['INSTRUCTIONS', 'PHASE_INTRO']" in estado
+    assert "ANSWER_FEEDBACK: ['QUIZ_PLAYING', 'PHASE_INTRO', 'PODIUM_REVIEW']" in estado
+    assert "porGrupo" in estado and "this.phases.push" in estado and "isFirstOfPhase" in estado and "phaseIntroFirst = false" in estado
+    # ambientes: 5 em rodízio (centro de dados + 4 novos), cada um com parede própria
+    assert "const ENVIRONMENTS = ['datacenter', 'escritorio', 'sala', 'laboratorio', 'biblioteca']" in renderer
+    for parede in ("wallOffice", "wallClass", "wallLab", "wallLibrary", "drawFloorEnv"):
+        assert f"function {parede}" in renderer, parede
+    assert "Q.env = R.envOf(GS.currentPhaseIndex)" in js and "R.drawRoom(ctx, VT, Q.doors.map(dr => dr.bx), Q.env)" in js
+    # animação: prédio com placa; "Você passou de fase!" só fora da primeira fase; pula com Enter/Esc/clique
+    assert "function drawBuilding" in renderer and "function drawSign" in renderer and "function drawStreet" in renderer
+    fase = js.split("function drawPhaseIntro")[1].split("QUIZ_PLAYING - perguntas")[0]
+    assert "if (!PI.first)" in fase and "Você passou de fase!" in fase and "R.drawSign(" in fase
+    assert "finishPhaseIntro" in js.split("pointerDown(x, y)")[1].split("pointerUp")[0] and "st === S.PHASE_INTRO" in js
+    assert "onEnter(GS.current)" in js.split("function startGame")[1].split("function avatarTab")[0]      # o avatar leva ao prédio, não direto às perguntas
