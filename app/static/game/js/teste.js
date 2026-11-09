@@ -138,7 +138,7 @@
           const d = IsoRenderer.layoutDoors(n); igual(d.length, n, 'quantidade');
           const xs = d.map(x => Math.round(x.bx)); const passo = xs[1] - xs[0];
           xs.forEach((x, i) => { if (i && Math.abs(x - xs[i - 1] - passo) > 1) throw new Error(`${n} portas fora de passo: ${xs}`); });
-          const centro = (xs[0] + xs[n - 1]) / 2; if (Math.abs(centro - 640) > 1) throw new Error(`${n} portas fora do centro: ${centro}`);
+          const centro = (xs[0] + xs[n - 1]) / 2; if (Math.abs(centro - IsoRenderer.ISO.cx) > 1) throw new Error(`${n} portas fora do centro: ${centro}`);
         }); return true;
       });
 
@@ -166,7 +166,7 @@
         while (GS.current !== S.PODIUM_REVIEW && guard++ < 4000) {
           vistos.add(GS.current);
           if (SM.inTransition) { ff(0.1); continue; }
-          if (GS.current === S.QUIZ_PLAYING && SM.Q.phase === 'play') { const dr = SM.Q.doors.find(d => d.alt.correct); SM.Q.a.gridX = (14.5 + dr.d) / 2; SM.Q.a.gridY = (14.5 - dr.d) / 2; kd('Enter'); ff(0.2); }
+          if (GS.current === S.QUIZ_PLAYING && SM.Q.phase === 'play') { const dr = SM.Q.doors.find(d => d.alt.correct); SM.Q.a.gridX = dr.gx; SM.Q.a.gridY = 0.9; kd('Enter'); ff(0.2); }
           else ff(0.2);
         }
         vistos.add(GS.current);

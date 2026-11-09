@@ -2,19 +2,20 @@
 (function () {
   'use strict';
 
-  const TW = 96, TH = 48;
-  // Sala NX x NY (12 x 10). A origem (OX, OY) coloca o centro do losango no centro da tela (cx) e a ponta
-  // inferior no início do rodapé; o fundo da sala passa por trás do cabeçalho.
-  // doorS: linha das portas (x + y constante). front: início da área jogável.
-  const ISO = { TW, TH, OX: 592, OY: 124, NX: 12, NY: 10, cx: 640, doorS: 12, front: 12.75 };
+  // Sala alinhada à base (vista frontal, 0°): a parede do fundo é horizontal e o chão é um retângulo. Coordenadas da sala:
+  // x = lateral (0 a NX, da esquerda para a direita) e y = profundidade (0 na base da parede das portas, crescendo em
+  // direção ao jogador). A sala ocupa a área à esquerda da barra lateral das alternativas (largura SW).
+  // OY é a linha da base da parede (onde ficam as portas); o chão vai até o rodapé.
+  const ISO = { U: 47, V: 47, VZ: 47, OX: 0, OY: 412, NX: 20, NY: 5.2, SW: 940, cx: 470 };
+  const TW = ISO.U, TH = ISO.V;
   let reduced = false;   // movimento reduzido: pulsos e flutuações do cenário ficam estáticos
   const SANS = '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   const MONO = '"Courier New", Courier, monospace';
   const CYAN = '#58a6ff';
 
-  // screenX = (x - y) * TW/2 + OX ;  screenY = (x + y) * TH/2 - z*TH + OY
+  // screenX = OX + x * U ;  screenY = OY + y * V - z * VZ
   function project(x, y, z) {
-    return [(x - y) * TW / 2 + ISO.OX, (x + y) * TH / 2 - (z || 0) * TH + ISO.OY];
+    return [ISO.OX + x * ISO.U, ISO.OY + y * ISO.V - (z || 0) * ISO.VZ];
   }
 
   // f < 1 escurece, f > 1 clareia (em direção ao branco). Entrada e saída: '#rrggbb'.
@@ -328,30 +329,27 @@
     ctx.restore();
   }
 
-  // ---------- Piso do campus ----------
+  // ---------- Piso do campus (retângulo alinhado à base) ----------
   function drawFloor(ctx, t) {
-    const NX = ISO.NX, NY = ISO.NY, th = 18;
-    const A = project(0, NY, 0), B = project(NX, NY, 0), C = project(NX, 0, 0);
-    poly(ctx, [A, B, [B[0], B[1] + th], [A[0], A[1] + th]], '#101c2b');
-    poly(ctx, [B, C, [C[0], C[1] + th], [B[0], B[1] + th]], '#0a1420');
-    ctx.strokeStyle = 'rgba(88,166,255,.55)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(A[0], A[1] + th); ctx.lineTo(B[0], B[1] + th); ctx.lineTo(C[0], C[1] + th);
-    ctx.stroke();
+    const x0 = ISO.OX, w = ISO.NX * ISO.U, y0 = ISO.OY, rows = 5, rh = ISO.NY * ISO.V / rows, th = 18, yF = y0 + rows * rh;
+    ctx.fillStyle = '#0a1420'; ctx.fillRect(x0, yF, w, th);                // espessura da borda frontal
+    ctx.fillStyle = '#101c2b'; ctx.fillRect(x0, yF, w, th * 0.55);
+    ctx.strokeStyle = 'rgba(88,166,255,.55)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0, yF + th); ctx.lineTo(x0 + w, yF + th); ctx.stroke();
 
-    for (let i = 0; i < NX; i++) {
-      for (let j = 0; j < NY; j++) {
-        const p0 = project(i, j, 0), p1 = project(i + 1, j, 0), p2 = project(i + 1, j + 1, 0), p3 = project(i, j + 1, 0);
+    for (let i = 0; i < ISO.NX; i++) {
+      for (let j = 0; j < rows; j++) {
+        const ax = x0 + i * ISO.U, ay = y0 + j * rh;
+        const p0 = [ax, ay], p1 = [ax + ISO.U, ay], p2 = [ax + ISO.U, ay + rh], p3 = [ax, ay + rh];
         const h = hash(i, j);
         const kind = h < 0.13 ? 'pcb' : h < 0.24 ? 'acr' : 'metal';
-        const cx = (p0[0] + p2[0]) / 2, cy = (p0[1] + p2[1]) / 2;
+        const cx = ax + ISO.U / 2, cy = ay + rh / 2;
         if (kind === 'metal') {
           poly(ctx, [p0, p1, p2, p3], shade('#2a3748', 0.88 + h * 0.5), 'rgba(130,180,245,.14)', 1);
           poly(ctx, [p0, p1, [cx, cy]], 'rgba(255,255,255,.04)');
         } else if (kind === 'pcb') {
           poly(ctx, [p0, p1, p2, p3], '#0b1e36', 'rgba(120,168,230,.2)', 1);
-          const a = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2], b = [cx, cy], c = [(p2[0] + p3[0]) / 2, (p2[1] + p3[1]) / 2];
+          const a = [ax, cy], b = [cx, cy], c = [cx, ay + rh];
           const pulse = 0.5 + 0.5 * Math.sin((reduced ? 0 : Date.now()) * 0.003 + h * 6);   // circuitos pulsando levemente
           ctx.strokeStyle = `rgba(56,139,253,${0.4 + pulse * 0.4})`;
           ctx.lineWidth = 2;
@@ -370,46 +368,67 @@
         }
       }
     }
-    const T = project(0, 0, 0);
-    ctx.strokeStyle = 'rgba(88,166,255,.7)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(A[0], A[1]); ctx.lineTo(T[0], T[1]); ctx.lineTo(C[0], C[1]);
-    ctx.stroke();
+    const sh = ctx.createLinearGradient(0, y0, 0, yF);                      // o fundo do chão fica mais escuro (profundidade)
+    sh.addColorStop(0, 'rgba(4,10,20,.55)'); sh.addColorStop(0.45, 'rgba(4,10,20,.12)'); sh.addColorStop(1, 'rgba(4,10,20,0)');
+    ctx.fillStyle = sh; ctx.fillRect(x0, y0, w, yF - y0);
+    ctx.strokeStyle = 'rgba(88,166,255,.7)'; ctx.lineWidth = 2;             // junção da parede com o chão
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0); ctx.stroke();
   }
 
-  const RACK = { top: '#354c6a', left: '#1c2838', right: '#101a26' };
-  const RACK_HI = { top: '#44628a', left: '#26374d', right: '#162334' };
+  // Parede do fundo: painel de dados com racks de servidores (LEDs piscando), faixa de luz e rodapé. Os racks desviam das portas.
+  function drawWall(ctx, t, doorXs) {
+    const x0 = ISO.OX, w = ISO.NX * ISO.U, y0 = ISO.OY;
+    const g = ctx.createLinearGradient(0, 0, 0, y0);
+    g.addColorStop(0, '#07111f'); g.addColorStop(0.55, '#0d2140'); g.addColorStop(1, '#14305a');
+    ctx.fillStyle = g; ctx.fillRect(x0, 0, w, y0);
+    ctx.fillStyle = 'rgba(88,166,255,.05)';                                   // colunas de painéis
+    for (let x = x0; x < x0 + w; x += ISO.U * 2) ctx.fillRect(x, 0, 2, y0);
+    ctx.fillStyle = 'rgba(88,166,255,.5)'; ctx.fillRect(x0, 22, w, 2);          // faixa de luz no alto
+    ctx.fillStyle = 'rgba(88,166,255,.12)'; ctx.fillRect(x0, 24, w, 26);
 
-  // Paredes de dados nas duas bordas do fundo: painéis translúcidos e racks de servidores (2 voxels).
-  function drawRacks(ctx, t) {
-    // painéis de vidro ao fundo (x = 0 e y = 0)
-    ctx.save();
-    ctx.globalAlpha = 0.22;
-    cube(ctx, -0.12, 0, 0, 0.12, ISO.NY, 2.1, '#4a8be0');
-    cube(ctx, 0, -0.12, 0, ISO.NX, 0.12, 2.1, '#4a8be0');
-    ctx.restore();
-    for (let k = 6; k <= ISO.NX - 1; k++) {
-      [[0, k], [k, 0]].forEach(([gx, gy], side) => {
-        if (gx + gy >= (side === 0 ? ISO.NY : ISO.NX)) return;     // dentro dos limites da sala
-        drawVoxel(ctx, gx, gy, 0, RACK);
-        drawVoxel(ctx, gx, gy, 1, RACK_HI);
-        for (let r = 0; r < 6; r++) {
-          const on = (Math.floor(t * 2 + r + k) % 3) !== 0;
-          ctx.fillStyle = on ? (r % 2 ? '#58a6ff' : '#8fbcf6') : '#14396a';
-          const lz = 0.12 + r * 0.16, off = 0.15 + (r % 2) * 0.35;
-          // LEDs na face voltada para a sala (x+1 para a borda x=0; y+1 para a borda y=0)
-          const p = side === 0 ? project(gx + 1, gy + off, lz) : project(gx + off, gy + 1, lz);
-          ctx.fillRect(p[0] - 3, p[1] - 2, 6, 3);
-        }
-      });
+    // monitores de dados na parte alta da parede (gráficos de barras animados), visíveis através do cabeçalho translúcido
+    for (let px = x0 + 36, k = 0; px + 150 < x0 + w; px += 200, k++) {
+      const py = 64, pw = 150, ph = 70;
+      ctx.fillStyle = 'rgba(8,26,52,.7)'; ctx.fillRect(px, py, pw, ph);
+      ctx.strokeStyle = 'rgba(88,166,255,.4)'; ctx.lineWidth = 1.5; ctx.strokeRect(px + 0.75, py + 0.75, pw - 1.5, ph - 1.5);
+      ctx.fillStyle = 'rgba(88,166,255,.35)'; ctx.fillRect(px + 10, py + 9, 44, 3); ctx.fillRect(px + 10, py + 16, 28, 2);
+      for (let b = 0; b < 12; b++) {
+        const hh = 8 + (0.55 + 0.45 * Math.sin((reduced ? 0 : t) * 1.4 + b * 0.9 + k * 2.1)) * 34 * (0.5 + hash(k, b));
+        ctx.fillStyle = b % 4 === 0 ? 'rgba(143,188,246,.75)' : 'rgba(56,139,253,.6)';
+        ctx.fillRect(px + 12 + b * 10.5, py + ph - 8 - hh, 6, hh);
+      }
     }
+    const rw = 70, gapX = 94, rh = 150;
+    for (let rx = x0 + 18, k = 0; rx + rw < x0 + w; rx += gapX, k++) {
+      const cx = rx + rw / 2;
+      if ((doorXs || []).some(d => Math.abs(d - cx) < DOOR_W / 2 + rw / 2 + 16)) continue;     // não esconde as portas
+      const top = y0 - rh;
+      const body = ctx.createLinearGradient(rx, 0, rx + rw, 0);
+      body.addColorStop(0, '#142238'); body.addColorStop(0.5, '#1c2f4c'); body.addColorStop(1, '#101c2e');
+      ctx.fillStyle = body; ctx.fillRect(rx, top, rw, rh);
+      ctx.strokeStyle = 'rgba(88,166,255,.4)'; ctx.lineWidth = 1.5; ctx.strokeRect(rx + 0.75, top + 0.75, rw - 1.5, rh - 1.5);
+      ctx.fillStyle = 'rgba(88,166,255,.35)'; ctx.fillRect(rx, top, rw, 3);
+      for (let r = 0; r < 7; r++) {
+        const yy = top + 14 + r * 19;
+        ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(rx + 8, yy, rw - 16, 11);          // gaveta
+        for (let l = 0; l < 3; l++) {
+          const on = (Math.floor((reduced ? 0 : t) * 2 + r + k + l) % 3) !== 0;
+          ctx.fillStyle = on ? (l % 2 ? '#58a6ff' : '#8fbcf6') : '#14396a';
+          ctx.fillRect(rx + 12 + l * 9, yy + 4, 5, 3);
+        }
+      }
+    }
+    ctx.fillStyle = '#16263d'; ctx.fillRect(x0, y0 - 9, w, 9);                   // rodapé da parede
+    ctx.fillStyle = 'rgba(88,166,255,.35)'; ctx.fillRect(x0, y0 - 9, w, 2);
   }
 
-  // Sala completa: piso, paredes de dados e racks.
-  function drawRoom(ctx, t) {
+  // Sala completa: parede do fundo e piso. doorXs = posições (em pixels) das portas, para os racks desviarem delas.
+  function drawRoom(ctx, t, doorXs) {
+    drawWall(ctx, t, doorXs);
     drawFloor(ctx, t);
-    drawRacks(ctx, t);
+    const v = ctx.createLinearGradient(0, 0, ISO.SW, 0);                         // vinheta lateral discreta
+    v.addColorStop(0, 'rgba(2,6,12,.45)'); v.addColorStop(0.08, 'rgba(2,6,12,0)'); v.addColorStop(0.92, 'rgba(2,6,12,0)'); v.addColorStop(1, 'rgba(2,6,12,.35)');
+    ctx.fillStyle = v; ctx.fillRect(0, 0, ISO.SW, ISO.OY + ISO.NY * ISO.V + 18);
   }
 
   // Faixa de dados (passarela) em perspectiva, da porta até o horizonte, visível pela eclusa aberta.
@@ -518,21 +537,49 @@
     glowText(ctx, letter, bx, cy + e * 0.95, `bold 26px ${MONO}`, '#f3f8fe', 10, 'center');
   }
 
-  // Distribui `count` portas (2 a 4) equidistantes e centralizadas na linha de portas.
-  // Cada item traz a posição (bx, by), a posição no grid (d = x - y), a área de clique (rect, em pixels)
-  // e a zona de colisão/ativação do avatar (zone, em coordenadas de grid: d e s = x + y).
+  // Distribui `count` portas (2 a 4) equidistantes e centralizadas na parede do fundo (área da sala).
+  // Cada item traz a posição (bx, by) e gx (lateral na sala), a área de clique (rect, em pixels) e a zona de ativação do
+  // avatar (zone: faixa lateral x0..x1 e profundidade máxima y1, em coordenadas da sala).
   function layoutDoors(count) {
     const n = Math.max(2, Math.min(4, count | 0));
     const sp = n === 2 ? 250 : n === 3 ? 190 : 150;
     return Array.from({ length: n }, (_, i) => {
-      const d = (ISO.cx + (i - (n - 1) / 2) * sp - ISO.OX) / (TW / 2);   // centralizadas na tela
-      const [bx, by] = project((ISO.doorS + d) / 2, (ISO.doorS - d) / 2, 0);
+      const bx = ISO.cx + (i - (n - 1) / 2) * sp, by = ISO.OY, gx = (bx - ISO.OX) / ISO.U;
       return {
-        index: i, d, bx, by,
+        index: i, gx, bx, by,
         rect: { x: bx - DOOR_W / 2, y: by - 190, w: DOOR_W + 12, h: 190 },
-        zone: { d0: d - 1.15, d1: d + 1.15, s0: ISO.front, s1: ISO.front + 2.4 }
+        zone: { x0: gx - 1.35, x1: gx + 1.35, y1: 1.5 }
       };
     });
+  }
+
+  // Caixa de dica: um cubo com "?" que fica na frente da sala, oposta às portas. (bx, by) = pé da caixa; glow 0..1 = proximidade.
+  function drawHintBox(ctx, bx, by, t, glow) {
+    const a = 32, h = 46, bob = reduced ? 0 : Math.sin(t * 2.2) * 3;
+    const cy = by - h - a / 2;                                              // centro da face de cima
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.4)';
+    ctx.beginPath(); ctx.ellipse(bx, by + 4, a * 1.15, 12, 0, 0, Math.PI * 2); ctx.fill();
+    if (glow > 0.02) {                                                      // zona de ativação no chão
+      ctx.globalAlpha = 0.2 + glow * 0.35; ctx.fillStyle = '#f2c230';
+      ctx.beginPath(); ctx.ellipse(bx, by + 6, a * 1.9, 20, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.shadowColor = '#f2c230'; ctx.shadowBlur = 8 + glow * 18;
+    isoBox(ctx, bx, cy, a, h, '#2b6fd1', '#1b4a96', '#10346b', glow > 0.05 ? '#ffe58a' : '#f2c230');
+    ctx.restore();
+    isoFaceLabel(ctx, '?', bx, cy, a, h, 34);                               // "?" na face da esquerda
+    const oy = cy - 34 + bob;                                               // medalhão dourado flutuando sobre a caixa
+    ctx.save();
+    ctx.shadowColor = '#f2c230'; ctx.shadowBlur = 12 + glow * 12;
+    ctx.beginPath(); ctx.arc(bx, oy, 15, 0, Math.PI * 2);
+    const g = ctx.createLinearGradient(bx - 15, oy - 15, bx + 15, oy + 15);
+    g.addColorStop(0, '#ffe58a'); g.addColorStop(1, '#d9a926');
+    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#a97d14'; ctx.stroke();
+    ctx.restore();
+    ctx.font = `bold 20px ${MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#5a3b00'; ctx.fillText('?', bx, oy + 1);
+    ctx.textBaseline = 'alphabetic';
   }
 
   // Desenha todas as portas (fundo, folhas, moldura e display holográfico). doorsData[i] = { letter, open, glow }.
@@ -568,7 +615,7 @@
     toScreen(gridX, gridY, gridZ) { return project(gridX, gridY, gridZ); }
     setReducedMotion(v) { reduced = !!v; }
     drawVoxel(ctx, gridX, gridY, gridZ, colors) { return drawVoxel(ctx, gridX, gridY, gridZ, colors); }
-    drawRoom(ctx, t) { return drawRoom(ctx, t); }
+    drawRoom(ctx, t, doorXs) { return drawRoom(ctx, t, doorXs); }
     drawDoors(ctx, count, doorsData) { return drawDoors(ctx, count, doorsData || []); }
     drawFade(ctx, alpha) { return drawFade(ctx, alpha); }
     loadLogos(config, callback) { return loadLogos(config, callback); }
@@ -577,7 +624,7 @@
   Object.assign(IsoRenderer.prototype, {
     project, shade, hash, poly, rr, cube, isoBox, isoFaceLabel, wrap, pixelText, glowText,
     drawBackground, drawPanel, drawButton, wipe, drawLogo,
-    drawFloor, drawRacks, drawWalkway, layoutDoors, drawDoorBack, drawDoorFront, drawHolo
+    drawFloor, drawWall, drawWalkway, layoutDoors, drawDoorBack, drawDoorFront, drawHolo, drawHintBox
   });
 
   window.IsoRendererClass = IsoRenderer;

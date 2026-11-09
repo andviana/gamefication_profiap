@@ -117,3 +117,25 @@ def test_tela_de_avatar_enxuta_com_ajuda_em_modal():
     # o texto de apoio vive no modal de ajuda, aberto pelo "?" ao lado do A+
     assert "function drawHelpModal" in js and "const HELP_AVATAR" in js and "iconButton(a.x - size - 8, a.y, size, 'Ajuda', openHelp" in js
     assert "if (HELP.open) { if (confirm || k === 'Escape') closeHelp()" in js and "HELP.open && GS.current === S.AVATAR_SELECT) drawHelpModal()" in js
+
+
+def test_tela_de_perguntas_com_barra_lateral_caixa_de_dica_e_sala_frontal():
+    js = (RAIZ / "app/static/game/js/screens.js").read_text(encoding="utf-8")
+    renderer = (RAIZ / "app/static/game/js/renderer.js").read_text(encoding="utf-8")
+    avatars = (RAIZ / "app/static/game/js/avatars.js").read_text(encoding="utf-8")
+    # sala alinhada à base: projeção sem diagonal
+    assert "ISO.OX + x * ISO.U" in renderer and "(x - y) * TW / 2" not in renderer
+    assert "get depth() { return this.gridY; }" in avatars and "get lateral() { return this.gridX; }" in avatars
+    # barra lateral rolável com as alternativas; as setas movem o boneco e não rolam a lista
+    assert "function drawSidebar" in js and "scr = SB;" in js and "st !== S.QUIZ_PLAYING && k === 'ArrowDown'" in js
+    assert "ALTERNATIVAS" in js and "drawSidebar(q, hm.hh)" in js and "hm = measureQHeader(q)" in js
+    # cabeçalho: sem botão de dica, título ao lado do grupo, fundo translúcido; "Pergunta N de T" no rodapé
+    assert "hintBtn" not in js and "'?  DICA'" not in js
+    cab = js.split("function drawQHeader")[1].split("function openHint")[0]
+    assert "rgba(13,17,23,.9)" in cab and "rgba(13,17,23,.94)" not in cab and "Pergunta" not in cab
+    rodape = js.split("function drawQFooter")[1].split("const SB =")[0]
+    assert "Pergunta ${GS.currentQuestionIndex + 1} de ${GS.totalQuestions}`" in rodape and "playerName" not in rodape      # discreto e sem o nome
+    assert "escolher porta ou caixa" in rodape and "function drawSidebarBar" in js and "drawSidebarBar(listY, listH" in js   # rolagem sempre visível
+    # caixa de dica no cenário, na frente (oposta às portas), com interação por Enter, clique e tecla H
+    assert "drawHintBox" in renderer and "Q.hint = hasHint ? { gx: 2.3, gy: NY - 0.95 } : null" in js
+    assert "else if (nearHint()) openHint()" in js and "walkToHint" in js and "(k === 'h' || k === 'H') && Q.hint" in js

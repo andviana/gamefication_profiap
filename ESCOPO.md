@@ -6,7 +6,7 @@ Este documento descreve o protótipo **como foi implementado**: os 6 prompts de 
 
 Jogo sério educacional, em ambiente web nativo, para **avaliação formativa gamificada**. Substitui a estética medieval (castelos e calabouços) por um **Campus Universitário Tecnológico / Hub de Inovação Digital**, com visual cúbico/voxel inspirado em Minecraft.
 
-O estudante controla um avatar em **perspectiva isométrica 2.5D** numa sala de centro de dados e escolhe **portas/eclusas digitais**, cada uma representando uma alternativa de múltipla escolha (2 a 4 por pergunta). **Depois de cada resposta**, uma tela de reação mostra o resultado: o avatar comemora se acertou e coça a cabeça, pensativo, se errou. O gabarito e as explicações aparecem na revisão final, no pódio.
+O estudante controla um avatar (prismas isométricos) numa sala de centro de dados **alinhada à base, vista de frente**, e escolhe **portas/eclusas digitais**, cada uma representando uma alternativa de múltipla escolha (2 a 4 por pergunta). **Depois de cada resposta**, uma tela de reação mostra o resultado: o avatar comemora se acertou e coça a cabeça, pensativo, se errou. O gabarito e as explicações aparecem na revisão final, no pódio.
 
 Instituição de exemplo: UFRA — Universidade Federal Rural da Amazônia / PROFIAP (configurável).
 
@@ -132,9 +132,11 @@ Entre telas e entre perguntas há um **wipe digital** (blocos que "ligam" da esq
    - **Confirmar** só habilita com nome válido e avatar escolhido; enquanto desabilitado, um texto diz o que falta.
    - **Validação do nome:** rejeita na hora espaços, acentos, símbolos e `_`, com aviso; limite de 15 caracteres (atributo `maxlength`), também com aviso.
 4. **Perguntas:**
-   - **Topo:** badge com o **Grupo**, acima do título e do enunciado; no canto superior direito, o **contador de XP** (moeda dourada desenhada por código e "N XP"), com a linha "Pergunta N de T · nome" logo abaixo. O cabeçalho cresce com o tamanho do texto, mas **nunca passa de 224 px**: o enunciado encolhe (até 16 px; só depois é cortado com reticências) e um título muito longo ganha reticências, para que as letras das portas e a linha "Pergunta N de T" fiquem sempre livres.
+   - **Topo (cabeçalho translúcido, o cenário aparece por trás):** na primeira linha, o badge com o **Grupo** e, ao lado dele, o **título**; no canto direito, o **contador de XP** (moeda dourada desenhada por código e "N XP"). Abaixo, o enunciado com a largura toda. O cabeçalho cresce com o tamanho do texto, mas **nunca passa de 224 px**: o enunciado encolhe (até 16 px; só depois é cortado com reticências) e um título muito longo ganha reticências, para que as letras das portas fiquem sempre livres.
+   - **Barra lateral direita (340 px):** as alternativas (letra + texto) em cartões, **rolável** (roda do mouse, arrastar, PageUp/PageDown; as setas movem o boneco), com o controle de rolagem (setas, trilho e alça) **sempre visível**. O cartão da porta mais próxima do avatar fica destacado e é rolado para a vista.
+   - **Rodapé:** "Pergunta N de T" (texto discreto, sem o nome), as dicas de controle e os botões A+ e som.
    - **Contador de XP:** o número sobe até o total real e o chip dá um pequeno "pulso" ao ganhar pontos (sem animação com movimento reduzido).
-   - **Dica:** o botão "? DICA" só aparece se houver autoajuda; abre um painel modal translúcido (tecla H ou clique) e **não custa XP**.
+   - **Dica:** só existe se a pergunta tiver autoajuda. É uma **caixa com "?" no cenário**, na frente da sala (do lado oposto às portas): o avatar chega perto e aperta Enter/Espaço (ou clica na caixa, e ele vai até lá) para abrir o painel modal translúcido; a tecla H também abre. **Não custa XP**.
    - **Centro:** 2 a 4 portas equidistantes e centralizadas, cada uma com um display holográfico cúbico com a letra.
    - **Rodapé:** texto das alternativas (até 3 linhas cada, com reticências); cresce com o tamanho do texto.
    - **Controles:** setas movem o avatar; diante de uma porta, **Enter/Espaço** confirma. Um clique na porta, ou a **letra da alternativa (A–D)**, faz o avatar caminhar **em linha reta** até ela e escolhê-la (o piso é livre, sem pathfinding). O aviso "Enter / Espaço" aparece quando o avatar está na zona da porta.
@@ -169,10 +171,10 @@ Com o campo do nome em foco, M, + − e os números são digitação; os botões
 
 ## 7. Cenário e renderização (`renderer.js`)
 
-- **Projeção:** `screenX = (x − y)·TW/2 + OX` e `screenY = (x + y)·TH/2 − z·TH + OY`, com tile **96 × 48**.
-- **Sala:** grid **12 × 10**, em tamanho real, com origem em (592, 124): o losango fica centralizado e sua ponta inferior toca o início do rodapé. O **fundo da sala passa por trás do cabeçalho**. Piso de ladrilhos metálicos, circuitos (PCB) com trilhos que pulsam (`Math.sin(Date.now()·0.003)`) e blocos de acrílico translúcido. Nas bordas do fundo há painéis de vidro e racks de servidores (voxels com LEDs).
-- **Portas:** fileira horizontal na tela (linha `x + y = 12`), centralizada em x = 640, de 120 × 136 px, com moldura metálica, feixe neon, folhas deslizantes e display holográfico. Espaçamento de 250, 190 e 150 px para 2, 3 e 4 portas. Cada porta tem uma **área de clique** e uma **zona de colisão/ativação** para o avatar.
-- **Área jogável:** o avatar nasce em (8,5; 7,5), não passa da "parede" das portas (`x + y ≥ 12,75`) nem dos limites da sala.
+- **Projeção (sala frontal, 0°):** `screenX = OX + x·U` e `screenY = OY + y·V − z·VZ`, com U = V = 47 px. x é a lateral e y a profundidade (0 na base da parede das portas, crescendo em direção ao jogador).
+- **Sala:** retângulo de **20 × 5,2** unidades (940 × 244 px) à esquerda da barra lateral, com a base da parede em y = 412 e o chão até o rodapé. Parede do fundo com monitores de dados animados e racks de servidores com LEDs (que desviam das portas). Piso de ladrilhos retangulares: metálicos, circuitos (PCB) com trilhos que pulsam (`Math.sin(Date.now()·0.003)`) e acrílico translúcido; o fundo do chão é mais escuro (profundidade).
+- **Portas:** fileira horizontal na base da parede, centralizada na área da sala (x = 470), de 120 × 136 px, com moldura metálica, feixe neon, folhas deslizantes e display holográfico. Espaçamento de 250, 190 e 150 px para 2, 3 e 4 portas. Cada porta tem uma **área de clique** e uma **zona de ativação** (faixa lateral de ±1,35 unidade e até 1,5 de profundidade) para o avatar.
+- **Área jogável:** o avatar nasce no centro (10; 3,4), não passa da parede das portas (y ≥ 0,75) nem dos limites da sala; o tamanho dele varia de leve com a profundidade (0,95× ao fundo a 1,2× na frente). A **caixa de dica** fica em (2,3; 4,25).
 - **Pódio:** blocos isométricos (`isoBox`) e rótulos projetados na face do bloco (`isoFaceLabel`).
 - **API:** `toScreen`, `drawVoxel`, `drawRoom`, `drawDoors`, `drawFade`, `loadLogos(config, callback)`, `setReducedMotion` e utilitários de UI e texto. `window.IsoRenderer` é uma instância (classe em `IsoRendererClass`) com alias `Renderer`.
 

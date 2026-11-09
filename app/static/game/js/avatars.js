@@ -363,8 +363,8 @@
 
     get moving() { return this.state === 'walking'; }
     get hasTarget() { return this.targetGridX !== null; }
-    get depth() { return this.gridX + this.gridY; }      // s = x + y
-    get lateral() { return this.gridX - this.gridY; }    // d = x - y
+    get depth() { return this.gridY; }                   // profundidade na sala (0 = base da parede das portas)
+    get lateral() { return this.gridX; }                 // posição lateral (da esquerda para a direita)
 
     // Inicia o deslocamento suave, em linha reta, até a posição alvo.
     moveTo(targetGridX, targetGridY, o) {
@@ -391,8 +391,7 @@
       if (!len || dist <= 0) return;
       this.gridX += dx / len * dist;
       this.gridY += dy / len * dist;
-      const sx = dx - dy;                      // direção horizontal na tela
-      if (sx > 0.01) this.facing = 'R'; else if (sx < -0.01) this.facing = 'L';
+      if (dx > 0.01) this.facing = 'R'; else if (dx < -0.01) this.facing = 'L';   // a sala é alinhada à tela: dx já é a direção horizontal
       if (bounded && this.bounds) this.bounds(this);
       this._moved = true;
     }

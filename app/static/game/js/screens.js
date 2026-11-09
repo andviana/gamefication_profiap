@@ -7,7 +7,7 @@
   const W = CFG.interface.canvasWidth, H = CFG.interface.canvasHeight;
   const R = window.IsoRenderer, AV = window.AvatarManager, GS = window.GameState, S = GS.STATES;
   const SANS = R.SANS, MONO = R.MONO, CYAN = R.CYAN;
-  const NX = R.ISO.NX, NY = R.ISO.NY, S0 = R.ISO.doorS, FRONT = R.ISO.front;
+  const NX = R.ISO.NX, NY = R.ISO.NY, SW = R.ISO.SW, FRONT = 0.75;      // sala alinhada à base: x = lateral, y = profundidade (0 = parede das portas)
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const inRect = (p, x, y, w, h) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
@@ -125,7 +125,7 @@
   // ---------- Botões de acessibilidade: tamanho do texto (A+) e som ----------
   function a11yAnchor() {
     if (GS.current === S.PODIUM_REVIEW) return { x: 16, y: 16 };
-    if (GS.current === S.QUIZ_PLAYING) return { x: W - 112, y: Q.footerTop - 56 };
+    if (GS.current === S.QUIZ_PLAYING) return { x: W - 112, y: Q.footerTop + (QF_H - 44) / 2 };
     return { x: W - 112, y: H - 60 };
   }
 
@@ -543,7 +543,8 @@
   // =====================================================================
   //  QUIZ_PLAYING - perguntas no cenário isométrico
   // =====================================================================
-  const Q = { q: null, doors: [], a: null, phase: 'play', timer: 0, chosen: null, hintBtn: null, near: null, footerTop: 652 };
+  const QF_H = 60;                                          // altura do rodapé (pergunta N de T e dicas de controle)
+  const Q = { q: null, doors: [], a: null, phase: 'play', timer: 0, chosen: null, hint: null, hintGlow: 0, near: null, nearHint: false, footerTop: H - QF_H };
   const SPEED = 2.3;
 
   // Contador de XP (canto superior direito): o número sobe até a pontuação real e o chip "pulsa" ao ganhar pontos.
@@ -589,47 +590,60 @@
     return { x, y, w, h };
   }
 
-  // Mantém o jogador dentro da sala e atrás da "parede" das portas.
+  // Mantém o jogador dentro da sala e na frente da parede das portas.
   function roomBounds(p) {
-    p.gridX = clamp(p.gridX, 0.4, NX - 0.4); p.gridY = clamp(p.gridY, 0.4, NY - 0.4);
-    const s = p.depth;
-    if (s < FRONT) { p.gridX += (FRONT - s) / 2; p.gridY += (FRONT - s) / 2; }
+    p.gridX = clamp(p.gridX, 0.6, NX - 0.6);
+    p.gridY = clamp(p.gridY, FRONT, NY - 0.15);
   }
 
   function initQuestion() {
     const q = GS.currentQuestion;
-    Q.q = q; Q.phase = 'play'; Q.chosen = null; Q.timer = 0; Q.near = null;
+    Q.q = q; Q.phase = 'play'; Q.chosen = null; Q.timer = 0; Q.near = null; Q.nearHint = false; Q.hintGlow = 0;
     Q.startedAt = performance.now(); Q.tempoMs = 0;          // o tempo de resposta vai ao servidor junto com a escolha
     if (GS.currentQuestionIndex === 0) { XP.shown = 0; XP.target = 0; XP.pulse = 0; }     // nova partida: contador zerado
     GS.activeModalHint = false;
     const layout = R.layoutDoors(q.alternatives.length);   // portas equidistantes e centralizadas
     Q.doors = q.alternatives.map((alt, i) => ({ alt, ...layout[i], open: 0, hl: 0 }));
     Q.a = new Player(GS.playerName, GS.selectedAvatar, {
-      gridX: 8.5, gridY: 7.5, speed: SPEED, bounds: roomBounds,
+      gridX: NX / 2, gridY: 3.4, speed: SPEED, bounds: roomBounds,
       onStep: () => SoundSystem.playStep()                 // o Player não conhece o áudio: avisa por callback
     });
     const hasHint = !!(q.hint && q.hint.trim());
+    Q.hint = hasHint ? { gx: 2.3, gy: NY - 0.95 } : null;   // caixa de dica: na frente da sala, do lado oposto às portas
+    SB.v = 0; SB.scrollTo = null;
     say(`Pergunta ${GS.currentQuestionIndex + 1} de ${GS.totalQuestions}. ${GS.currentQuestionIndex > 0 ? 'Pontuação atual: ' + GS.score + ' ' + CFG.economy.currencySymbol + '. ' : ''}${q.group ? 'Grupo: ' + q.group + '. ' : ''}${q.title ? q.title + '. ' : ''}${q.question} ` +
       'Alternativas: ' + q.alternatives.map(a => `${a.letter}, ${a.text}`).join('; ') + '. ' +
-      'Pressione a letra da alternativa para ir até a porta, ou use as setas e Enter. ' + (hasHint ? 'Dica disponível: tecla H.' : ''));
+      'Pressione a letra da alternativa para ir até a porta, ou use as setas e Enter. ' + (hasHint ? 'Dica disponível: a caixa com interrogação no cenário, ou a tecla H.' : ''));
   }
 
   function nearDoor() {
-    const a = Q.a, s = a.depth, d = a.lateral;
+    const a = Q.a, x = a.gridX, y = a.gridY;
     let best = null, bd = Infinity;
-    Q.doors.forEach(dr => {                                // zona de colisão/ativação de cada porta
+    Q.doors.forEach(dr => {                                // zona de ativação de cada porta
       const z = dr.zone;
-      if (s > z.s1 || d < z.d0 || d > z.d1) return;
-      const dd = Math.abs(d - dr.d);
+      if (y > z.y1 || x < z.x0 || x > z.x1) return;
+      const dd = Math.abs(x - dr.gx);
       if (dd < bd) { bd = dd; best = dr; }
     });
     return best;
   }
 
+  const hintRect = () => { const p = R.project(Q.hint.gx, Q.hint.gy, 0); return { x: p[0] - 46, y: p[1] - 128, w: 92, h: 144 }; };
+  function nearHint() {
+    const h = Q.hint, a = Q.a;
+    return !!h && Math.abs(a.gridX - h.gx) <= 1.9 && Math.abs(a.gridY - h.gy) <= 1.5;
+  }
+
   // Clique (ou letra) em uma porta: o avatar caminha em linha reta até a frente dela e então a escolhe.
   function walkToDoor(dr) {
     if (Q.phase !== 'play' || GS.activeModalHint) return;
-    Q.a.moveTo((FRONT + 0.05 + dr.d) / 2, (FRONT + 0.05 - dr.d) / 2, { speed: SPEED * 1.15, onArrive: () => chooseDoor(dr) });
+    Q.a.moveTo(dr.gx, FRONT + 0.05, { speed: SPEED * 1.15, onArrive: () => chooseDoor(dr) });
+  }
+
+  // Clique na caixa de dica: o avatar caminha até ela e a dica abre ao chegar.
+  function walkToHint() {
+    if (!Q.hint || Q.phase !== 'play' || GS.activeModalHint) return;
+    Q.a.moveTo(Q.hint.gx + 1.4, Q.hint.gy - 0.3, { speed: SPEED * 1.15, onArrive: () => { Q.a.facing = 'L'; openHint(); } });
   }
 
   function chooseDoor(dr) {
@@ -637,8 +651,7 @@
     const a = Q.a;
     Q.tempoMs = Math.round(performance.now() - Q.startedAt);   // até escolher a porta (a caminhada e a animação não contam)
     Q.chosen = dr; Q.phase = 'opening'; Q.timer = 0; a.stop(); a.facing = 'L';
-    const s = a.depth;                                     // alinha o avatar ao eixo da porta enquanto ela abre
-    a.moveTo((s + dr.d) / 2, (s - dr.d) / 2, { speed: 3.5, bounded: false });
+    a.moveTo(dr.gx, a.gridY, { speed: 3.5, bounded: false });  // alinha o avatar ao eixo da porta enquanto ela abre
     SoundSystem.playDoorOpen();
     say(`Resposta ${dr.alt.letter} registrada.`);          // sem dizer se está certa ou errada
   }
@@ -646,7 +659,7 @@
   function enterDoor(dr) {
     const a = Q.a;
     a.facing = 'L';
-    a.moveTo((S0 - 0.6 + dr.d) / 2, (S0 - 0.6 - dr.d) / 2, {
+    a.moveTo(dr.gx, -0.9, {
       speed: 2.4, bounded: false,
       onArrive: () => {
         a.alpha = 0;
@@ -663,18 +676,22 @@
       const want = (Q.phase === 'play' && !GS.activeModalHint && (nearDoor() === dr || inRect(mouse, dr.rect.x, dr.rect.y, dr.rect.w, dr.rect.h))) ? 1 : 0;
       dr.hl += (want - dr.hl) * Math.min(1, dt * 10);
     });
+    const wantH = (Q.hint && Q.phase === 'play' && !GS.activeModalHint && (nearHint() || inRect(mouse, hintRect().x, hintRect().y, hintRect().w, hintRect().h))) ? 1 : 0;
+    Q.hintGlow += (wantH - Q.hintGlow) * Math.min(1, dt * 10);
     if (GS.activeModalHint) { a.stop(); a.update(dt); return; }
 
     if (Q.phase === 'play') {
       const ax = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0);
       const ay = (keys.ArrowDown ? 1 : 0) - (keys.ArrowUp ? 1 : 0);
-      if (ax || ay) a.moveBy(ax + ay, -ax + ay, dt);       // teclado cancela o alvo do clique
+      if (ax || ay) a.moveBy(ax, ay, dt);                  // a sala é alinhada à tela; o teclado cancela o alvo do clique
       a.update(dt);
       const near = nearDoor();                              // avisa o leitor de tela ao chegar numa porta
       if (near !== Q.near) {
         Q.near = near;
-        if (near) say(`Porta ${near.alt.letter}: ${near.alt.text}. Pressione Enter para confirmar.`);
+        if (near) { say(`Porta ${near.alt.letter}: ${near.alt.text}. Pressione Enter para confirmar.`); SB.scrollTo = near.index; }   // a barra lateral mostra o cartão da porta
       }
+      const nh = nearHint();
+      if (nh !== Q.nearHint) { Q.nearHint = nh; if (nh) say('Caixa de dica. Pressione Enter para abrir a dica.'); }
     } else if (Q.phase === 'opening') {
       Q.timer += dt;
       const dr = Q.chosen;
@@ -683,7 +700,7 @@
       if (dr.open >= 1 && !a.hasTarget) { Q.phase = 'walkin'; enterDoor(dr); }
     } else if (Q.phase === 'walkin') {
       a.update(dt);
-      if (Q.phase === 'walkin') a.alpha = clamp((a.depth - (S0 - 0.5)) / 1.1, 0, 1);
+      if (Q.phase === 'walkin') a.alpha = clamp((a.gridY + 0.45) / 0.9, 0, 1);       // some ao atravessar a porta
     } else if (Q.phase === 'closing') {
       a.update(dt);
       Q.timer += dt;
@@ -714,48 +731,47 @@
     return { size, lines };
   }
 
-  function drawQHeader(q) {
-    // medidas primeiro: o cabeçalho cresce com o tamanho do texto
-    const bh = F(16) + 14, tSize = F(21);
-    const hasHint = !!(q.hint && q.hint.trim());
-    const titleY = 12 + bh + 8, qY = titleY + tSize + 12;
-    const fit = fitQuestion(q.question, hasHint ? 1000 : 1190, HEADER_MAX - 12 - qY);   // o enunciado encolhe, e não o cenário, quando falta espaço
+  // Medidas do cabeçalho: ele cresce com o tamanho do enunciado (a barra lateral começa logo abaixo dele).
+  function measureQHeader(q) {
+    const bh = F(16) + 14, qY = 12 + bh + 12;
+    const fit = fitQuestion(q.question, W - 80, HEADER_MAX - 12 - qY);   // o enunciado encolhe, e não o cenário, quando falta espaço
     const lh = Math.round(fit.size * 1.22);
-    const hh = Math.max(202, Math.min(HEADER_MAX, qY + fit.lines.length * lh + 12));
+    const hh = Math.max(120, Math.min(HEADER_MAX, qY + fit.lines.length * lh + 14));
+    return { bh, qY, fit, lh, hh };
+  }
 
-    ctx.fillStyle = 'rgba(13,17,23,.94)'; ctx.fillRect(0, 0, W, hh);
+  // Cabeçalho translúcido (o cenário aparece por trás): grupo + título na mesma linha, pontuação à direita e o enunciado abaixo.
+  function drawQHeader(q, m) {
+    const { bh, qY, fit, lh, hh } = m;
+    const g = ctx.createLinearGradient(0, 0, 0, hh);
+    g.addColorStop(0, 'rgba(13,17,23,.9)'); g.addColorStop(1, 'rgba(13,17,23,.78)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, hh);
     ctx.fillStyle = CYAN; ctx.fillRect(0, hh, W, 2);
+    const chip = drawXPChip(W - 40, 12, bh);                          // pontuação em XP, com ícone de moeda
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-    if (q.group) {                                                    // badge do Grupo, acima do enunciado
+    let tx = 40;
+    if (q.group) {                                                    // badge do Grupo
       ctx.font = font(16, true);
       const label = q.group.toUpperCase(), bw = ctx.measureText(label).width + 40;
       R.drawPanel(ctx, 40, 12, bw, bh, { fill: 'rgba(31,111,235,.25)', stroke: CYAN, lw: 2, radius: bh / 2, glow: 6 });
       ctx.fillStyle = CYAN; ctx.fillRect(54, 12 + bh / 2 - 4, 8, 8);
       ctx.fillStyle = '#e1ecfb'; ctx.fillText(label, 70, 12 + bh / 2 + 1);
+      tx = 40 + bw + 18;
     }
-    drawXPChip(W - 40, 12, bh);                                       // pontuação em XP, com ícone de moeda
-    const infoY = 12 + bh + 14 + F(16) / 2;
-    ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillStyle = C.mute; ctx.font = font(16, true);
-    ctx.fillText(`Pergunta ${GS.currentQuestionIndex + 1} de ${GS.totalQuestions} · ${GS.playerName}`, W - 40, infoY);
-    ctx.textAlign = 'left';
-    if (q.title) {                                                    // o título não invade a linha "Pergunta N de T · nome"
-      ctx.font = font(16, true);
-      const infoW = ctx.measureText(`Pergunta ${GS.currentQuestionIndex + 1} de ${GS.totalQuestions} · ${GS.playerName}`).width;
-      const maxW = Math.max(240, W - 40 - infoW - 40 - 24);
+    if (q.title) {                                                    // título ao lado do grupo, cortado se não couber antes da pontuação
       ctx.font = font(21, true);
+      const maxW = Math.max(200, chip.x - 24 - tx);
       let title = q.title;
       while (title.length > 1 && ctx.measureText(title).width > maxW) title = title.slice(0, -2).trimEnd() + '…';
-      ctx.fillStyle = C.title; ctx.fillText(title, 40, titleY + tSize / 2);
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowBlur = 6;
+      ctx.fillStyle = C.title; ctx.fillText(title, tx, 12 + bh / 2 + 1);
+      ctx.restore();
     }
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.85)'; ctx.shadowBlur = 7;      // sombra leve: o texto continua legível sobre o cenário
     ctx.font = `${fit.size}px ${SANS}`; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'top';
     fit.lines.forEach((ln, i) => ctx.fillText(ln, 40, qY + i * lh));
+    ctx.restore();
     ctx.textBaseline = 'alphabetic';
-    Q.hintBtn = null;
-    if (hasHint) {                                                    // botão de dica: só existe se houver autoajuda
-      const bx = W - 40 - 160, by = Math.max(70, Math.round(infoY + F(16) / 2 + 12));
-      Q.hintBtn = { x: bx, y: by, w: 160, h: 54 };
-      button('?  DICA', bx, by, 160, 54, openHint, { fontSize: 22 });
-    }
   }
 
   function openHint() {
@@ -765,31 +781,81 @@
   }
   function closeHint() { if (GS.activeModalHint) { GS.activeModalHint = false; SoundSystem.playHintClick(); say('Dica fechada.'); } }
 
-  // Rodapé com o texto das alternativas; cresce com o tamanho do texto (até 3 linhas, com reticências).
-  function drawQFooter(q) {
-    const n = q.alternatives.length, colW = (W - 60) / n;
-    const chip = F(26), fs = F(16), lh = Math.round(fs * 1.2);
-    ctx.font = `${fs}px ${SANS}`;
-    let maxL = 1;
-    const cols = q.alternatives.map(alt => {
-      let lines = R.wrap(ctx, alt.text, colW - chip - 18);
-      if (lines.length > 3) { lines = lines.slice(0, 3); lines[2] = lines[2].replace(/\s*\S*$/, '') + '…'; }
-      maxL = Math.max(maxL, lines.length);
-      return lines;
-    });
-    const fh = Math.max(68, 18 + maxL * lh + 8, chip + 24), fy = H - fh;
-    Q.footerTop = fy;
-    ctx.fillStyle = 'rgba(13,17,23,.96)'; ctx.fillRect(0, fy, W, fh);
+  // Rodapé: "Pergunta N de T · nome" e as dicas de controle (os botões A+ e som ficam no canto direito).
+  function drawQFooter() {
+    const fy = Q.footerTop;
+    ctx.fillStyle = 'rgba(13,17,23,.96)'; ctx.fillRect(0, fy, W, QF_H);
     ctx.fillStyle = CYAN; ctx.fillRect(0, fy, W, 2);
-    q.alternatives.forEach((alt, i) => {
-      const x = 30 + i * colW;
-      R.drawPanel(ctx, x, fy + 10, chip, chip, { fill: '#0e386e', stroke: CYAN, radius: 5, lw: 1.5 });
-      ctx.fillStyle = '#fff'; ctx.font = font(16, true, MONO); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(alt.letter, x + chip / 2, fy + 10 + chip / 2 + 1);
-      ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `${fs}px ${SANS}`; ctx.fillStyle = C.soft;
-      cols[i].forEach((ln, k) => ctx.fillText(ln, x + chip + 8, fy + 10 + k * lh));
-    });
+    const info = `Pergunta ${GS.currentQuestionIndex + 1} de ${GS.totalQuestions}`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = font(14); ctx.fillStyle = C.mute;
+    ctx.fillText(info, 30, fy + QF_H / 2 + 2);
+    const x0 = 30 + ctx.measureText(info).width + 28, avail = W - 130 - x0;
+    ctx.font = font(14); ctx.fillStyle = C.mute;
+    const opts = [Q.hint ? 'Setas: mover · Enter/Espaço ou letra: escolher porta ou caixa' : 'Setas: mover · Enter/Espaço ou letra: escolher porta',
+                  Q.hint ? 'Setas: mover · Enter: escolher porta ou caixa' : 'Setas: mover · Enter: escolher porta'];
+    const tip = opts.find(t => ctx.measureText(t).width <= avail);
+    if (tip) ctx.fillText(tip, x0, fy + QF_H / 2 + 2);
     ctx.textBaseline = 'alphabetic';
+  }
+
+  // Barra lateral direita com as alternativas, rolável (roda do mouse, arrastar, PageUp/PageDown). O cartão da porta mais
+  // próxima do boneco fica destacado e é rolado para a vista.
+  const SB = { x: SW, w: W - SW, y: 0, h: 0, v: 0, max: 0, scrollTo: null };
+  function drawSidebar(q, top) {
+    const bottom = Q.footerTop, x = SB.x, w = SB.w;
+    ctx.fillStyle = 'rgba(13,17,23,.9)'; ctx.fillRect(x, top + 2, w, bottom - top - 2);
+    ctx.fillStyle = CYAN; ctx.fillRect(x, top + 2, 2, bottom - top - 2);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = C.mute; ctx.font = font(16, true);
+    ctx.fillText('ALTERNATIVAS', x + 22, top + 33);
+    const listY = top + 46, listH = bottom - listY - 8;
+    const chip = F(34), pad = 12, fs = F(18), lh = Math.round(fs * 1.3), cx0 = x + 16, cw = w - 16 - 26, tw = cw - pad * 2 - chip - 12;
+    ctx.font = `${fs}px ${SANS}`;
+    let yy = 0;
+    const cards = q.alternatives.map(alt => {
+      const lines = R.wrap(ctx, alt.text, tw), hgt = Math.max(chip, lines.length * lh) + pad * 2;
+      const c = { y: yy, h: hgt, lines }; yy += hgt + 10; return c;
+    });
+    SB.y = listY; SB.h = listH; SB.max = Math.max(0, yy - 10 - listH);
+    if (SB.scrollTo != null) { const c = cards[SB.scrollTo]; if (c) SB.v = c.y - (listH - c.h) / 2; SB.scrollTo = null; }
+    SB.v = clamp(SB.v, 0, SB.max);
+    scr = SB;                                          // roda do mouse, arrastar e PageUp/PageDown rolam esta lista
+    ctx.save(); ctx.beginPath(); ctx.rect(x, listY, w, listH); ctx.clip();
+    q.alternatives.forEach((alt, i) => {
+      const c = cards[i], cy = listY + c.y - SB.v;
+      if (cy + c.h < listY || cy > listY + listH) return;
+      const hl = Q.doors[i] ? Q.doors[i].hl > 0.3 : false;
+      R.drawPanel(ctx, cx0, cy, cw, c.h, { fill: hl ? 'rgba(20,59,110,.92)' : 'rgba(22,27,34,.92)', stroke: hl ? CYAN : 'rgba(88,166,255,.3)', glow: hl ? 10 : 0, radius: 10, lw: hl ? 2.5 : 1.5 });
+      R.drawPanel(ctx, cx0 + pad, cy + pad, chip, chip, { fill: '#0e386e', stroke: CYAN, radius: 6, lw: 1.5 });
+      ctx.fillStyle = '#fff'; ctx.font = font(20, true, MONO); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(alt.letter, cx0 + pad + chip / 2, cy + pad + chip / 2 + 1);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `${fs}px ${SANS}`; ctx.fillStyle = hl ? '#ffffff' : C.soft;
+      c.lines.forEach((ln, k) => ctx.fillText(ln, cx0 + pad + chip + 12, cy + pad + k * lh));
+    });
+    ctx.restore();
+    if (SB.max > 0 && SB.v < SB.max - 1) {            // esmaecido embaixo: ainda há alternativas para ver
+      const f = ctx.createLinearGradient(0, bottom - 38, 0, bottom - 8);
+      f.addColorStop(0, 'rgba(13,17,23,0)'); f.addColorStop(1, 'rgba(13,17,23,.95)');
+      ctx.fillStyle = f; ctx.fillRect(x + 2, bottom - 38, w - 2, 30);
+    }
+    drawSidebarBar(listY, listH, x + w - 20);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // Controle de rolagem da barra lateral: trilho, setas e alça, SEMPRE visíveis (a alça é cheia e esmaecida quando tudo cabe).
+  function drawSidebarBar(y, h, bx) {
+    const bw = 12, can = SB.max > 0, ah = 14, ty = y + ah + 2, th = h - 2 * (ah + 2);
+    const tri = (cy, up, on) => {
+      ctx.beginPath();
+      ctx.moveTo(bx + bw / 2, up ? cy - 4 : cy + 4); ctx.lineTo(bx + 1, up ? cy + 3 : cy - 3); ctx.lineTo(bx + bw - 1, up ? cy + 3 : cy - 3); ctx.closePath();
+      ctx.fillStyle = on ? CYAN : 'rgba(88,166,255,.3)'; ctx.fill();
+    };
+    tri(y + ah / 2, true, can && SB.v > 0);
+    tri(y + h - ah / 2, false, can && SB.v < SB.max - 1);
+    R.rr(ctx, bx, ty, bw, th, 6); ctx.fillStyle = 'rgba(88,166,255,.18)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(88,166,255,.45)'; ctx.lineWidth = 1; ctx.stroke();
+    const hh = can ? Math.max(44, th * h / (h + SB.max)) : th, hy = can ? ty + (th - hh) * (SB.v / SB.max) : ty;
+    R.rr(ctx, bx + 1.5, hy + 1.5, bw - 3, hh - 3, 4.5);
+    ctx.fillStyle = can ? CYAN : 'rgba(88,166,255,.35)'; ctx.fill();
   }
 
   function drawHintModal(q) {
@@ -811,43 +877,44 @@
   }
 
   function drawQuiz() {
-    const q = Q.q, a = Q.a;
+    const q = Q.q, a = Q.a, hm = measureQHeader(q), modal = GS.activeModalHint;
     R.drawBackground(ctx, VT);
-    R.drawRoom(ctx, VT);
-    const zone = (Q.phase === 'play' && !GS.activeModalHint) ? nearDoor() : null;
-    const sp = R.project(a.gridX, a.gridY, 0);
+    R.drawRoom(ctx, VT, Q.doors.map(dr => dr.bx));
+    const zoneDoor = (Q.phase === 'play' && !modal) ? nearDoor() : null;
+    const zoneHint = (Q.phase === 'play' && !modal && !zoneDoor && nearHint());
+    const sp = R.project(a.gridX, a.gridY, 0), sc = 0.95 + 0.25 * (a.gridY / NY);      // mais perto do jogador, um pouco maior
     const avatar = () => {
-      if (a.alpha > 0.01) AV.drawAvatar(ctx, sp[0], sp[1], a.avatarIndex, a.state, a.walkPhase, { scale: 1.1, t: VT, face: a.facing, alpha: a.alpha });
+      if (a.alpha > 0.01) AV.drawAvatar(ctx, sp[0], sp[1], a.avatarIndex, a.state, a.walkPhase, { scale: sc, t: VT, face: a.facing, alpha: a.alpha });
     };
+    const hintBox = () => { if (Q.hint) { const p = R.project(Q.hint.gx, Q.hint.gy, 0); R.drawHintBox(ctx, p[0], p[1], VT, Q.hintGlow); } };
+    const hintFirst = !!Q.hint && Q.hint.gy < a.gridY;                                 // quem está mais ao fundo é desenhado primeiro
     if (Q.phase === 'walkin') {                                        // dentro da eclusa, atrás da moldura
       Q.doors.forEach(dr => R.drawDoorBack(ctx, dr.bx, dr.by, VT, dr.open));
-      avatar();
+      hintBox(); avatar();
       Q.doors.forEach(dr => { R.drawDoorFront(ctx, dr.bx, dr.by, VT, dr.open, dr.hl); R.drawHolo(ctx, dr.bx, dr.by, dr.alt.letter, VT, dr.hl); });
     } else {
       R.drawDoors(ctx, Q.doors.length, Q.doors.map(dr => ({ letter: dr.alt.letter, open: dr.open, glow: dr.hl })));
-      avatar();
+      if (hintFirst) { hintBox(); avatar(); } else { avatar(); hintBox(); }
     }
     if (Q.phase === 'closing') R.drawFade(ctx, Math.min(0.45, Q.timer));
-    if (zone) {
-      const label = 'Enter / Espaço';
+    if (zoneDoor || zoneHint) {
+      const label = zoneDoor ? 'Enter / Espaço' : 'Dica · Enter / Espaço';
       ctx.font = font(16, true);
-      const w = ctx.measureText(label).width + 28, bh = F(16) + 14;
-      R.drawPanel(ctx, sp[0] - w / 2, sp[1] - 172, w, bh, { fill: 'rgba(13,17,23,.94)', radius: bh / 2, glow: 8 });
+      const w = ctx.measureText(label).width + 28, bh = F(16) + 14, ly = sp[1] - Math.round(158 * sc);
+      R.drawPanel(ctx, sp[0] - w / 2, ly, w, bh, { fill: 'rgba(13,17,23,.94)', radius: bh / 2, glow: 8 });
       ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(label, sp[0], sp[1] - 172 + bh / 2 + 1); ctx.textBaseline = 'alphabetic';
+      ctx.fillText(label, sp[0], ly + bh / 2 + 1); ctx.textBaseline = 'alphabetic';
     }
-    drawQFooter(q);
-    const fy = Q.footerTop;
-    ctx.fillStyle = C.mute; ctx.font = font(16); ctx.textAlign = 'left';
-    const tips = ['Setas: mover · Enter/Espaço ou letra: escolher porta', 'Clique em uma porta para ir até ela'];
-    tips.forEach((tx, i) => ctx.fillText(tx, 30, fy - 12 - (tips.length - 1 - i) * Math.round(F(16) * 1.25)));
-    drawQHeader(q);
-    if (Q.phase === 'play' && !GS.activeModalHint) {
+    drawSidebar(q, hm.hh);
+    drawQFooter();
+    drawQHeader(q, hm);
+    if (Q.phase === 'play' && !modal) {
       Q.doors.forEach(dr => hit(dr.rect.x, dr.rect.y, dr.rect.w, dr.rect.h, () => walkToDoor(dr),
         { label: `Porta ${dr.alt.letter}`, say: `Porta ${dr.alt.letter}: ${dr.alt.text}. Enter para escolher.` }));
+      if (Q.hint) { const r = hintRect(); hit(r.x, r.y, r.w, r.h, walkToHint, { label: 'Caixa de dica', say: 'Caixa de dica. Enter para ir até ela e abrir a dica.' }); }
     }
     drawA11yButtons();
-    if (GS.activeModalHint) drawHintModal(q);
+    if (modal) drawHintModal(q);
   }
 
   // =====================================================================
@@ -1161,7 +1228,7 @@
   }
 
   const ScreenManager = {
-    Q, AVS, keys, XP, FB,
+    Q, AVS, SB, keys, XP, FB,
     initQuestion,
     get inTransition() { return Trans.active; },
     get fontLevel() { return fontLevel; },
@@ -1234,16 +1301,16 @@
       } else if (st === S.QUIZ_PLAYING) {
         if (k.startsWith('Arrow')) KF.label = null;                      // andar com as setas devolve o Enter à porta próxima
         if (GS.activeModalHint) { if (confirm || k === 'Escape' || k === 'h' || k === 'H') closeHint(); return prevent; }
-        if (confirm && Q.phase === 'play') { const dr = nearDoor(); if (dr) chooseDoor(dr); }
-        else if ((k === 'h' || k === 'H') && Q.hintBtn) openHint();
+        if (confirm && Q.phase === 'play') { const dr = nearDoor(); if (dr) chooseDoor(dr); else if (nearHint()) openHint(); }
+        else if ((k === 'h' || k === 'H') && Q.hint) openHint();
         else if (k.length === 1 && plain && Q.phase === 'play') {         // letras A-D: vai até a porta e confirma
           const dr = Q.doors.find(d => d.alt.letter === k.toUpperCase());
           if (dr) { say(`Indo para a porta ${dr.alt.letter}.`); walkToDoor(dr); }
         }
       }
       if (scr) {
-        if (k === 'ArrowDown') scr.v = clamp(scr.v + 50, 0, scr.max);
-        else if (k === 'ArrowUp') scr.v = clamp(scr.v - 50, 0, scr.max);
+        if (st !== S.QUIZ_PLAYING && k === 'ArrowDown') scr.v = clamp(scr.v + 50, 0, scr.max);       // nas perguntas, as setas movem o boneco
+        else if (st !== S.QUIZ_PLAYING && k === 'ArrowUp') scr.v = clamp(scr.v - 50, 0, scr.max);
         else if (k === 'PageDown') scr.v = clamp(scr.v + scr.h * 0.9, 0, scr.max);
         else if (k === 'PageUp') scr.v = clamp(scr.v - scr.h * 0.9, 0, scr.max);
       }

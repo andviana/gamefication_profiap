@@ -1,6 +1,6 @@
 # TechQuiz Campus
 
-Jogo educacional de perguntas e respostas em perspectiva isométrica 2.5D, para avaliação formativa. O estudante controla um avatar numa sala de centro de dados e escolhe uma **porta** para responder cada pergunta de múltipla escolha. Depois de cada resposta, o avatar reage (comemora se acertou e coça a cabeça, pensativo, se errou); o gabarito e as explicações aparecem na revisão final.
+Jogo educacional de perguntas e respostas em 2.5D (avatares isométricos numa sala alinhada à base, vista de frente), para avaliação formativa. O estudante controla um avatar numa sala de centro de dados e escolhe uma **porta** para responder cada pergunta de múltipla escolha. Depois de cada resposta, o avatar reage (comemora se acertou e coça a cabeça, pensativo, se errou); o gabarito e as explicações aparecem na revisão final.
 
 O jogo roda no navegador e faz parte do sistema de coleta de dados: o aluno entra com o **código da turma**, joga, e as respostas anônimas são gravadas no servidor para análise. O servidor (Flask) também serve o jogo na raiz do site; para instalar e operar, veja [README_ADMIN.md](README_ADMIN.md). Para o escopo técnico completo do jogo, veja [ESCOPO.md](ESCOPO.md) (a parte de dados e de perguntas ali descrita foi substituída pelo sistema web: ver [PLANO_ADMIN.md](PLANO_ADMIN.md)).
 
@@ -22,7 +22,7 @@ Abra `http://127.0.0.1:5000/`: o jogo é servido na raiz. O professor cadastra o
 1. Na abertura, o campo do **código da turma** está sempre vazio e já com o foco (borda verde neon e cursor piscando); o **?** ao lado do rótulo mostra a dica (passe o mouse ou toque). Digite o código (5 letras; o professor informa) e pressione Enter ou clique em **Iniciar**. O código é conferido no servidor: se estiver errado, desativado ou fora do prazo, a tela explica; muitos erros seguidos bloqueiam o computador por alguns minutos.
 2. Leia as orientações (incluem o aviso de privacidade) e continue.
 3. Na tela **Crie seu avatar** o campo do nome já abre com o foco (borda verde neon e cursor piscando). Digite seu nome (letras e números, sem espaços, acentos ou símbolos, até 15 caracteres), escolha um avatar (clique, setas, ou **Tab** e as teclas **1 a 9**) e confirme. O botão **?** ao lado do **A+** abre a ajuda com todas as explicações. O nome e o avatar ficam só na tela: **nunca são enviados**.
-4. Em cada pergunta, leia o enunciado no topo e escolha uma porta. Cada porta é uma alternativa, identificada pela letra no display acima dela e pelo texto no rodapé.
+4. Em cada pergunta, leia o enunciado no topo (com o grupo e o título) e escolha uma porta. Cada porta é uma alternativa, identificada pela letra no display acima dela; o texto das alternativas fica na **barra lateral direita**, que rola (roda do mouse, arrastar, PageUp/PageDown) e destaca a porta ao lado da qual o avatar está. O rodapé mostra, de forma discreta, "Pergunta N de T".
 5. A resposta é gravada ao cruzar a porta, e **há uma única tentativa por pergunta**.
 6. Uma tela de reação mostra o resultado: o avatar comemora (acerto) ou coça a cabeça, pensativo (erro), e você vê o XP ganho. Enter, Espaço ou clique pulam a animação.
 7. Ao terminar, o jogo **envia as respostas ao servidor** (aparece "Salvando suas respostas…", com novas tentativas automáticas se a conexão falhar) e só então mostra o pódio e a revisão de cada pergunta. Se o envio falhar, o pódio avisa e oferece **Tentar enviar de novo**; se a coleta já tiver encerrado, o aviso diz que as respostas não foram salvas. **Jogar Novamente** volta à abertura, **sempre com o campo do código vazio**.
@@ -37,7 +37,7 @@ Pontuação padrão: **100 XP** por acerto e **10 XP** por resposta incorreta (p
 |---|---|---|
 | Andar | — | Setas |
 | Escolher porta | Clicar na porta (o avatar vai até ela) | Enter ou Espaço diante da porta, ou a letra **A, B, C ou D** |
-| Ver a dica (se houver) | Botão **? DICA** | Tecla **H** (Esc fecha) |
+| Ver a dica (se houver) | Clicar na **caixa com ?** no cenário (o avatar vai até ela) | Enter ou Espaço junto da caixa, ou a tecla **H** (Esc fecha) |
 | Escolher avatar | Clicar no cartão | **Tab** leva o foco do nome aos avatares; **1 a 9** ou ← → escolhem; Tab volta ao nome |
 | Pular a tela de reação | Clique | Enter, Espaço ou Esc |
 | Ligar/desligar o som | Botão de alto-falante | Tecla **M** |
