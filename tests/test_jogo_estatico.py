@@ -160,3 +160,11 @@ def test_fases_por_grupo_ambientes_e_animacao_do_predio():
     assert "if (!PI.first)" in fase and "Você passou de fase!" in fase and "R.drawSign(" in fase
     assert "finishPhaseIntro" in js.split("pointerDown(x, y)")[1].split("pointerUp")[0] and "st === S.PHASE_INTRO" in js
     assert "onEnter(GS.current)" in js.split("function startGame")[1].split("function avatarTab")[0]      # o avatar leva ao prédio, não direto às perguntas
+
+
+def test_cartoes_da_barra_lateral_escolhem_a_alternativa_sem_atrapalhar_a_rolagem():
+    js = (RAIZ / "app/static/game/js/screens.js").read_text(encoding="utf-8")
+    barra = js.split("function drawSidebar")[1].split("function drawSidebarBar")[0]
+    assert "walkToDoor(Q.doors[i])" in barra and "deferred: true" in barra and "Q.target === dr" in barra       # clicar vai até a porta e entra
+    assert "if (b.deferred)" in js and "PEND" in js.split("pointerUp()")[1].split("},")[0] and "< 8" in js.split("pointerUp()")[1]   # só vale sem arrastar
+    assert "Q.target = dr;" in js.split("function walkToDoor")[1].split("function walkToHint")[0]

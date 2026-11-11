@@ -39,7 +39,8 @@
     buttons.push({ x, y, w, h, fn, enabled, focusable: true, label, say: `Botão ${label.replace(/\?/g, '').replace(/\s+/g, ' ').trim()}` });   // sem o "?" do ícone da dica
     R.drawButton(ctx, label, x, y, w, h, { enabled, hover: enabled && inRect(mouse, x, y, w, h), primary: o.primary, fontSize: F(o.fontSize || 22) });
   }
-  function hit(x, y, w, h, fn, o) { buttons.push({ x, y, w, h, fn, enabled: true, focusable: !!(o && o.label), label: o && o.label, say: o && o.say }); }
+  function hit(x, y, w, h, fn, o) { buttons.push({ x, y, w, h, fn, enabled: true, focusable: !!(o && o.label), label: o && o.label, say: o && o.say, deferred: !!(o && o.deferred) }); }
+  let PEND = null;   // clique adiado (cartões da barra lateral): só vale se o ponteiro não foi arrastado (arrastar rola a lista)
 
   // ---------- Foco por teclado ----------
   const focusList = () => buttons.filter(b => b.focusable && b.enabled);
@@ -657,7 +658,7 @@
 
   function initQuestion() {
     const q = GS.currentQuestion;
-    Q.q = q; Q.phase = 'play'; Q.chosen = null; Q.timer = 0; Q.near = null; Q.nearHint = false; Q.hintGlow = 0;
+    Q.q = q; Q.target = null; Q.phase = 'play'; Q.chosen = null; Q.timer = 0; Q.near = null; Q.nearHint = false; Q.hintGlow = 0;
     Q.env = R.envOf(GS.currentPhaseIndex);                  // cada fase (grupo) tem o seu ambiente
     Q.startedAt = performance.now(); Q.tempoMs = 0;          // o tempo de resposta vai ao servidor junto com a escolha
     if (GS.currentQuestionIndex === 0) { XP.shown = 0; XP.target = 0; XP.pulse = 0; }     // nova partida: contador zerado
@@ -697,6 +698,7 @@
   // Clique (ou letra) em uma porta: o avatar caminha em linha reta até a frente dela e então a escolhe.
   function walkToDoor(dr) {
     if (Q.phase !== 'play' || GS.activeModalHint) return;
+    Q.target = dr;                                          // a barra lateral destaca a alternativa escolhida enquanto o boneco anda
     Q.a.moveTo(dr.gx, FRONT + 0.05, { speed: SPEED * 1.15, onArrive: () => chooseDoor(dr) });
   }
 
@@ -743,7 +745,7 @@
     if (Q.phase === 'play') {
       const ax = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0);
       const ay = (keys.ArrowDown ? 1 : 0) - (keys.ArrowUp ? 1 : 0);
-      if (ax || ay) a.moveBy(ax, ay, dt);                  // a sala é alinhada à tela; o teclado cancela o alvo do clique
+      if (ax || ay) { Q.target = null; a.moveBy(ax, ay, dt); }                  // a sala é alinhada à tela; o teclado cancela o alvo do clique
       a.update(dt);
       const near = nearDoor();                              // avisa o leitor de tela ao chegar numa porta
       if (near !== Q.near) {
@@ -883,7 +885,7 @@
     q.alternatives.forEach((alt, i) => {
       const c = cards[i], cy = listY + c.y - SB.v;
       if (cy + c.h < listY || cy > listY + listH) return;
-      const hl = Q.doors[i] ? Q.doors[i].hl > 0.3 : false;
+      const dr = Q.doors[i], hl = dr ? (dr.hl > 0.3 || Q.target === dr || Q.chosen === dr) : false;
       R.drawPanel(ctx, cx0, cy, cw, c.h, { fill: hl ? 'rgba(20,59,110,.92)' : 'rgba(22,27,34,.92)', stroke: hl ? CYAN : 'rgba(88,166,255,.3)', glow: hl ? 10 : 0, radius: 10, lw: hl ? 2.5 : 1.5 });
       R.drawPanel(ctx, cx0 + pad, cy + pad, chip, chip, { fill: '#0e386e', stroke: CYAN, radius: 6, lw: 1.5 });
       ctx.fillStyle = '#fff'; ctx.font = font(20, true, MONO); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -892,6 +894,12 @@
       c.lines.forEach((ln, k) => ctx.fillText(ln, cx0 + pad + chip + 12, cy + pad + k * lh));
     });
     ctx.restore();
+    if (Q.phase === 'play' && !GS.activeModalHint) {                  // clicar no cartão = escolher a alternativa: o boneco vai até a porta e entra
+      q.alternatives.forEach((alt, i) => {
+        const c = cards[i], top2 = Math.max(listY + c.y - SB.v, listY), bot2 = Math.min(listY + c.y - SB.v + c.h, listY + listH);
+        if (bot2 > top2 && Q.doors[i]) hit(cx0, top2, cw, bot2 - top2, () => walkToDoor(Q.doors[i]), { deferred: true });
+      });
+    }
     if (SB.max > 0 && SB.v < SB.max - 1) {            // esmaecido embaixo: ainda há alternativas para ver
       const f = ctx.createLinearGradient(0, bottom - 38, 0, bottom - 8);
       f.addColorStop(0, 'rgba(13,17,23,0)'); f.addColorStop(1, 'rgba(13,17,23,.95)');
@@ -1309,14 +1317,20 @@
       KF.label = null;
       for (let i = buttons.length - 1; i >= 0; i--) {
         const b = buttons[i];
-        if (b.enabled && inRect(mouse, b.x, b.y, b.w, b.h)) { SoundSystem.playHintClick(); b.fn(); return true; }
+        if (b.enabled && inRect(mouse, b.x, b.y, b.w, b.h)) {
+          if (b.deferred) { PEND = { b, x: mouse.x, y: mouse.y }; if (scr && inRect(mouse, scr.x, scr.y, scr.w, scr.h)) drag = { y: mouse.y, v: scr.v }; return true; }
+          SoundSystem.playHintClick(); b.fn(); return true;
+        }
       }
       if (GS.current === S.ANSWER_FEEDBACK) { skipFeedback(); return true; }          // clique: pula a reação
       if (GS.current === S.PHASE_INTRO) { finishPhaseIntro(); return true; }          // clique: pula a animação do prédio
       if (scr && inRect(mouse, scr.x, scr.y, scr.w, scr.h)) drag = { y: mouse.y, v: scr.v };
       return false;
     },
-    pointerUp() { drag = null; },
+    pointerUp() {
+      const p = PEND; PEND = null; drag = null;
+      if (p && Math.hypot(mouse.x - p.x, mouse.y - p.y) < 8) { SoundSystem.playHintClick(); p.b.fn(); }   // clicou (não arrastou): ativa
+    },
     wheel(dy) { if (!scr) return false; scr.v = clamp(scr.v + dy, 0, scr.max); return true; },
 
     // Retorna true se a tecla foi tratada (o chamador pode então chamar preventDefault).
